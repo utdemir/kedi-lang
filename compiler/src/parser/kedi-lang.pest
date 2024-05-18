@@ -1,0 +1,73 @@
+ws = _{ (" " | "\r" | "\n" | "\t")+ }
+WHITESPACE = _{ ws }
+
+semi = _{ ";" }
+
+COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+
+// Expressions
+
+placeholder_identifier = { "_" }
+value_identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
+
+func_call_arg_list = { "(" ~ (expr ~ ("," ~ expr)*)? ~ ")" }
+
+func_call = { value_identifier ~ func_call_arg_list }
+
+number_literal = { ASCII_DIGIT+ }
+
+string_literal = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+
+literal = { number_literal | string_literal }
+
+op_chars = { "+" | "-" | "*" | "/" | "%" | "=" | "!" | "<" | ">" | "&" | "|" | "." }
+operator = { op_chars+ }
+
+pl_expr = { 
+    func_call | value_identifier | placeholder_identifier | literal |
+    bracket_expr
+} 
+
+bracket_expr = { "(" ~ expr ~ ")" }
+
+op_expr = { pl_expr ~ operator ~ expr }
+
+expr = {
+    op_expr |
+    pl_expr
+}
+
+
+// Statements
+ 
+fun_arg = { value_identifier ~ ":" ~ expr }
+fun_arg_list = { "(" ~ (fun_arg ~ ("," ~ fun_arg)*)? ~ ")" }
+fun_decl = {
+    "fn" ~ value_identifier 
+        ~ fun_arg_list ~ ":" ~ expr ~ block
+}
+
+let_decl = { "let" ~ value_identifier ~ "=" ~ expr ~ semi }
+
+assignment = { value_identifier ~ "=" ~ expr ~  semi }
+
+inv = { "@" ~ expr ~ semi }
+
+while = { "while" ~ expr ~ block }
+
+return = { "return" ~ expr ~ semi }
+
+stmt = {
+    fun_decl |
+    let_decl |
+    assignment |
+    inv |
+    return |
+    while
+}
+
+// File
+
+block = { "{" ~ stmt* ~ "}" }
+
+module = { SOI ~ stmt* ~ EOI }

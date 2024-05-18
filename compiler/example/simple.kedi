@@ -1,0 +1,3 @@
+fn add(fst: Number) -> Number {
+    return fst;
+}
