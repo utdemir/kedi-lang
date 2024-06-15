@@ -57,8 +57,9 @@ while = { "while" ~ expr ~ block }
 
 return = { "return" ~ expr ~ semi }
 
-stmt = {
-    fun_decl |
+top_level_stmt = { fun_decl }
+
+fun_stmt = {
     let_decl |
     assignment |
     inv |
@@ -68,6 +69,6 @@ stmt = {
 
 // File
 
-block = { "{" ~ stmt* ~ "}" }
+block = { "{" ~ fun_stmt* ~ "}" }
 
-module = { SOI ~ stmt* ~ EOI }
+module = { SOI ~ top_level_stmt* ~ EOI }

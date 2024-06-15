@@ -1,0 +1,3 @@
+fn id(fst: Number): Number {
+    return fst;
+}

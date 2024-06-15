@@ -1,0 +1,10 @@
+[package]
+name = "kedi"
+version = "0.1.0"
+edition = "2021"
+default-run = "kedi"
+
+[dependencies]
+clap = { version = "4.5.4", features = ["derive"] }
+kedi-lang = { path = "../compiler" }
+patharg = "0.4.0"

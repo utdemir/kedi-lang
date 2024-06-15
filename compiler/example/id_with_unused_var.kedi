@@ -1,0 +1,4 @@
+fn id(fst: Number): Number {
+    let a = 99;
+    return fst;
+}

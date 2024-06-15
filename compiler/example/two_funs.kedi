@@ -1,0 +1,7 @@
+fn id(a: Number): Number {
+    return a;
+}
+
+fn still_id(b: Number): Number {
+    return id(b);
+}

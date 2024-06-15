@@ -24,15 +24,15 @@ fn p_module(pair: Pair<Rule>) -> syntax::Module {
     for i in inner {
         match i.as_rule() {
             Rule::EOI => continue,
-            Rule::stmt => statements.push(p_stmt(i)),
+            Rule::top_level_stmt => statements.push(p_top_level_stmt(i)),
             otherwise => panic!("Unexpected rule in module: {:?}", otherwise),
         }
     }
     syntax::Module { statements }
 }
 
-fn p_stmt(pair: Pair<Rule>) -> syntax::Statement {
-    let inner = get_inner_pair(Rule::stmt, pair);
+fn p_top_level_stmt(pair: Pair<Rule>) -> syntax::TopLevelStatement {
+    let inner = get_inner_pair(Rule::top_level_stmt, pair);
 
     match inner.as_rule() {
         Rule::fun_decl => {
@@ -64,7 +64,7 @@ fn p_stmt(pair: Pair<Rule>) -> syntax::Statement {
                 Rule::block => {
                     let mut body = vec![];
                     for stmt in _body.into_inner() {
-                        body.push(p_stmt(stmt));
+                        body.push(p_fun_stmt(stmt));
                     }
                     body
                 }
@@ -74,13 +74,21 @@ fn p_stmt(pair: Pair<Rule>) -> syntax::Statement {
                 ),
             };
 
-            return syntax::Statement::FunDecl(syntax::FunDecl {
+            return syntax::TopLevelStatement::FunDecl(syntax::FunDecl {
                 name,
                 parameters,
-                return_predicate,
+                return_predicate: Some(return_predicate),
                 body,
             });
         }
+        otherwise => panic!("Unexpected rule in module: {:?}", otherwise),
+    }
+}
+
+fn p_fun_stmt(pair: Pair<Rule>) -> syntax::FunStatement {
+    let inner = get_inner_pair(Rule::fun_stmt, pair);
+
+    match inner.as_rule() {
         Rule::r#return => {
             let _expr = inner.into_inner().next().unwrap();
             let expr = match _expr.as_rule() {
@@ -91,7 +99,7 @@ fn p_stmt(pair: Pair<Rule>) -> syntax::Statement {
                 ),
             };
 
-            return syntax::Statement::Return(expr);
+            return syntax::FunStatement::Return(expr);
         }
         Rule::inv => {
             let _expr = inner.into_inner().next().unwrap();
@@ -100,7 +108,7 @@ fn p_stmt(pair: Pair<Rule>) -> syntax::Statement {
                 otherwise => panic!("Unexpected rule in inv (expecting expr): {:?}", otherwise),
             };
 
-            return syntax::Statement::Inv(expr);
+            return syntax::FunStatement::Inv(expr);
         }
         Rule::let_decl => {
             let mut inner = inner.into_inner();
@@ -115,7 +123,7 @@ fn p_stmt(pair: Pair<Rule>) -> syntax::Statement {
                 ),
             };
 
-            return syntax::Statement::LetDecl(name, predicate);
+            return syntax::FunStatement::LetDecl(name, predicate);
         }
         Rule::r#while => {
             let mut inner = inner.into_inner();
@@ -131,7 +139,7 @@ fn p_stmt(pair: Pair<Rule>) -> syntax::Statement {
                 Rule::block => {
                     let mut body = vec![];
                     for stmt in _body.into_inner() {
-                        body.push(p_stmt(stmt));
+                        body.push(p_fun_stmt(stmt));
                     }
                     body
                 }
@@ -141,7 +149,7 @@ fn p_stmt(pair: Pair<Rule>) -> syntax::Statement {
                 ),
             };
 
-            return syntax::Statement::While(predicate, body);
+            return syntax::FunStatement::While(predicate, body);
         }
         Rule::assignment => {
             let mut inner = inner.into_inner();
@@ -156,7 +164,7 @@ fn p_stmt(pair: Pair<Rule>) -> syntax::Statement {
                 ),
             };
 
-            return syntax::Statement::Assignment(name, predicate);
+            return syntax::FunStatement::Assignment(name, predicate);
         }
 
         r => todo!("stmt: {:?}", r),

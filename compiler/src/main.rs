@@ -8,7 +8,7 @@ fn main() {
     let contents = std::fs::read_to_string(FILENAME).expect("Could not read file");
 
     let syntax = crate::parser::parse(&contents).expect("Could not parse file");
-    let renamed = crate::renamer::rename(syntax);
+    let renamed = crate::renamer::rename(&syntax);
 
     println!("{:#?}", renamed)
 }
