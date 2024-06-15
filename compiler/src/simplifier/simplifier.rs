@@ -1,5 +1,4 @@
 use super::simple;
-use crate::parser::syntax;
 use crate::renamer::plain;
 
 pub fn run(fun: &plain::Module) -> simple::Module {

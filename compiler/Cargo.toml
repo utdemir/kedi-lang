@@ -16,3 +16,9 @@ pretty = "0.12.3"
 wasm-encoder = "0.209.1"
 wasmprinter = "0.209.1"
 wast = "209.0.1"
+
+[dev-dependencies]
+test-case = "3.3.1"
+test_each_file = "0.3.2"
+wasmparser = "0.210.0"
+wasmtime = "21.0.1"

@@ -1,11 +1,14 @@
 use core::panic;
 
-use crate::parser::syntax::{self as syntax};
+use crate::parser;
+use crate::parser::syntax;
 use pest::{
     iterators::{Pair, Pairs},
     Parser,
 };
 use pest_derive::Parser;
+
+use super::located::*;
 
 #[derive(Parser)]
 #[grammar = "parser/kedi-lang.pest"]
@@ -26,12 +29,13 @@ fn p_module(pair: Pair<Rule>) -> syntax::Module {
             Rule::EOI => continue,
             Rule::top_level_stmt => statements.push(p_top_level_stmt(i)),
             otherwise => panic!("Unexpected rule in module: {:?}", otherwise),
-        }
+        };
     }
     syntax::Module { statements }
 }
 
-fn p_top_level_stmt(pair: Pair<Rule>) -> syntax::TopLevelStatement {
+fn p_top_level_stmt(pair: Pair<Rule>) -> Located<syntax::TopLevelStatement> {
+    let top_loc = pair_to_loc(&pair);
     let inner = get_inner_pair(Rule::top_level_stmt, pair);
 
     match inner.as_rule() {
@@ -60,6 +64,7 @@ fn p_top_level_stmt(pair: Pair<Rule>) -> syntax::TopLevelStatement {
             };
 
             let _body = inner.next().unwrap();
+            let body_loc = pair_to_loc(&_body);
             let body = match _body.as_rule() {
                 Rule::block => {
                     let mut body = vec![];
@@ -69,28 +74,32 @@ fn p_top_level_stmt(pair: Pair<Rule>) -> syntax::TopLevelStatement {
                     body
                 }
                 otherwise => panic!(
-                    "Unexpected rule in fun_decl (expecting block): {:?}",
+                    "Unexpected rule in fun_decl (e∂xpecting block): {:?}",
                     otherwise
                 ),
             };
 
-            return syntax::TopLevelStatement::FunDecl(syntax::FunDecl {
-                name,
-                parameters,
-                return_predicate: Some(return_predicate),
-                body,
-            });
+            return top_loc.attach(syntax::TopLevelStatement::FunDecl(top_loc.attach(
+                syntax::FunDecl {
+                    name,
+                    parameters,
+                    return_predicate: Some(return_predicate),
+                    body: body_loc.attach(body),
+                },
+            )));
         }
         otherwise => panic!("Unexpected rule in module: {:?}", otherwise),
     }
 }
 
-fn p_fun_stmt(pair: Pair<Rule>) -> syntax::FunStatement {
+fn p_fun_stmt(pair: Pair<Rule>) -> Located<syntax::FunStatement> {
+    let top_loc = pair_to_loc(&pair);
     let inner = get_inner_pair(Rule::fun_stmt, pair);
 
-    match inner.as_rule() {
+    let stmt = match inner.as_rule() {
         Rule::r#return => {
             let _expr = inner.into_inner().next().unwrap();
+            let loc = pair_to_loc(&_expr);
             let expr = match _expr.as_rule() {
                 Rule::expr => p_expr(_expr),
                 otherwise => panic!(
@@ -99,34 +108,38 @@ fn p_fun_stmt(pair: Pair<Rule>) -> syntax::FunStatement {
                 ),
             };
 
-            return syntax::FunStatement::Return(expr);
+            syntax::FunStatement::Return(loc.attach(syntax::Return { value: expr }))
         }
         Rule::inv => {
             let _expr = inner.into_inner().next().unwrap();
+            let loc = pair_to_loc(&_expr);
             let expr = match _expr.as_rule() {
                 Rule::expr => p_expr(_expr),
                 otherwise => panic!("Unexpected rule in inv (expecting expr): {:?}", otherwise),
             };
 
-            return syntax::FunStatement::Inv(expr);
+            syntax::FunStatement::Inv(loc.attach(syntax::Inv { value: expr }))
         }
         Rule::let_decl => {
             let mut inner = inner.into_inner();
+            let loc = pairs_to_loc(&inner);
+
             let name = p_value_identifier(inner.next().unwrap());
 
-            let _predicate = inner.next().unwrap();
-            let predicate = match _predicate.as_rule() {
-                Rule::expr => p_expr(_predicate),
+            let _value = inner.next().unwrap();
+            let value = match _value.as_rule() {
+                Rule::expr => p_expr(_value),
                 otherwise => panic!(
                     "Unexpected rule in let_decl (expecting expr): {:?}",
                     otherwise
                 ),
             };
 
-            return syntax::FunStatement::LetDecl(name, predicate);
+            syntax::FunStatement::LetDecl(loc.attach(syntax::LetDecl { name, value }))
         }
         Rule::r#while => {
             let mut inner = inner.into_inner();
+            let loc = pairs_to_loc(&inner);
 
             let _predicate = inner.next().unwrap();
             let predicate = match _predicate.as_rule() {
@@ -149,44 +162,53 @@ fn p_fun_stmt(pair: Pair<Rule>) -> syntax::FunStatement {
                 ),
             };
 
-            return syntax::FunStatement::While(predicate, body);
+            syntax::FunStatement::While(loc.attach(syntax::While {
+                condition: predicate,
+                body: body,
+            }))
         }
         Rule::assignment => {
             let mut inner = inner.into_inner();
+            let loc = pairs_to_loc(&inner);
+
             let name = p_value_identifier(inner.next().unwrap());
 
-            let _predicate = inner.next().unwrap();
-            let predicate = match _predicate.as_rule() {
-                Rule::expr => p_expr(_predicate),
+            let _value = inner.next().unwrap();
+            let value = match _value.as_rule() {
+                Rule::expr => p_expr(_value),
                 otherwise => panic!(
                     "Unexpected rule in assignment (expecting expr): {:?}",
                     otherwise
                 ),
             };
 
-            return syntax::FunStatement::Assignment(name, predicate);
+            syntax::FunStatement::Assignment(loc.attach(syntax::Assignment { name, value }))
         }
 
         r => todo!("stmt: {:?}", r),
-    }
+    };
+
+    top_loc.attach(stmt)
 }
 
-fn p_value_identifier(pair: Pair<Rule>) -> syntax::Identifier {
+fn p_value_identifier(pair: Pair<Rule>) -> Located<syntax::Identifier> {
     match pair.as_rule() {
         Rule::value_identifier => {
             let value = pair.as_str().to_string();
+            let loc = pair_to_loc(&pair);
             debug_assert!(
                 !value.contains(" "),
                 "invalid value_identifier: {:?}",
                 value
             );
-            syntax::Identifier { name: value }
+            loc.attach(syntax::Identifier { name: value })
         }
         otherwise => panic!("Unexpected rule in value_identifier: {:?}", otherwise),
     }
 }
 
-fn p_fun_arg_list(pair: Pair<Rule>) -> Vec<syntax::FunParam> {
+fn p_fun_arg_list(pair: Pair<Rule>) -> Located<Vec<Located<syntax::FunParam>>> {
+    let loc = pair_to_loc(&pair);
     let inner = get_inner_pairs(Rule::fun_arg_list, pair);
 
     let mut params = vec![];
@@ -198,19 +220,20 @@ fn p_fun_arg_list(pair: Pair<Rule>) -> Vec<syntax::FunParam> {
         }
     }
 
-    params
+    loc.attach(params)
 }
 
-fn p_fun_arg(pair: Pair<Rule>) -> syntax::FunParam {
+fn p_fun_arg(pair: Pair<Rule>) -> Located<syntax::FunParam> {
+    let loc = pair_to_loc(&pair);
     let mut inner = get_inner_pairs(Rule::fun_arg, pair);
 
     let name = p_value_identifier(inner.next().unwrap());
     let predicate = p_expr(inner.next().unwrap());
 
-    syntax::FunParam { name, predicate }
+    loc.attach(syntax::FunParam { name, predicate })
 }
 
-fn p_expr(pair: Pair<Rule>) -> syntax::Expr {
+fn p_expr(pair: Pair<Rule>) -> Located<syntax::Expr> {
     let inner = get_inner_pair(Rule::expr, pair);
 
     match inner.as_rule() {
@@ -220,18 +243,22 @@ fn p_expr(pair: Pair<Rule>) -> syntax::Expr {
     }
 }
 
-fn p_pl_expr(pair: Pair<Rule>) -> syntax::Expr {
+fn p_pl_expr(pair: Pair<Rule>) -> Located<syntax::Expr> {
+    let loc = pair_to_loc(&pair);
     let inner = get_inner_pair(Rule::pl_expr, pair);
 
     match inner.as_rule() {
-        Rule::value_identifier => syntax::Expr::ValueIdentifier(p_value_identifier(inner)),
+        Rule::value_identifier => {
+            loc.attach(syntax::Expr::ValueIdentifier(p_value_identifier(inner)))
+        }
         Rule::literal => p_literal(inner),
-        Rule::func_call => syntax::Expr::FunCall(p_func_call(inner)),
+        Rule::func_call => loc.attach(syntax::Expr::FunCall(p_func_call(inner))),
         _ => todo!("p_pl_expr: {:?}", inner),
     }
 }
 
-fn p_op_expr(pair: Pair<Rule>) -> syntax::Expr {
+fn p_op_expr(pair: Pair<Rule>) -> Located<syntax::Expr> {
+    let loc = pair_to_loc(&pair);
     let mut inner = get_inner_pairs(Rule::op_expr, pair);
 
     let left = p_pl_expr(inner.next().unwrap());
@@ -243,33 +270,40 @@ fn p_op_expr(pair: Pair<Rule>) -> syntax::Expr {
     let id = op.into_inner().as_str().to_string();
     debug_assert!(!id.contains(" "));
 
-    return syntax::Expr::Op(
+    return loc.attach(syntax::Expr::Op(
         Box::new(left),
         syntax::Identifier { name: id },
         Box::new(right),
-    );
+    ));
 }
 
-fn p_literal(pair: Pair<Rule>) -> syntax::Expr {
+fn p_literal(pair: Pair<Rule>) -> Located<syntax::Expr> {
+    let loc = pair_to_loc(&pair);
     let inner = get_inner_pair(Rule::literal, pair);
 
-    match inner.as_rule() {
-        Rule::number_literal => syntax::Expr::LitNumber(inner.as_str().parse().unwrap()),
-        Rule::string_literal => syntax::Expr::LitString(inner.as_str().to_string()),
+    let ret = match inner.as_rule() {
+        Rule::number_literal => {
+            syntax::Expr::LitNumber(loc.attach(inner.as_str().parse().unwrap()))
+        }
+        Rule::string_literal => syntax::Expr::LitString(loc.attach(inner.as_str().to_string())),
         otherwise => panic!("Unexpected rule in literal: {:?}", otherwise),
-    }
+    };
+
+    loc.attach(ret)
 }
 
-fn p_func_call(pair: Pair<Rule>) -> syntax::FunCall {
+fn p_func_call(pair: Pair<Rule>) -> Located<syntax::FunCall> {
+    let loc = pair_to_loc(&pair);
     let mut inner = get_inner_pairs(Rule::func_call, pair);
 
     let name = p_value_identifier(inner.next().unwrap());
     let arguments = p_func_call_arg_list(inner.next().unwrap());
 
-    syntax::FunCall { name, arguments }
+    loc.attach(syntax::FunCall { name, arguments })
 }
 
-fn p_func_call_arg_list(pair: Pair<Rule>) -> Vec<syntax::Expr> {
+fn p_func_call_arg_list(pair: Pair<Rule>) -> Located<Vec<Located<syntax::Expr>>> {
+    let loc = pair_to_loc(&pair);
     let inner = get_inner_pairs(Rule::func_call_arg_list, pair);
 
     let mut args = vec![];
@@ -281,7 +315,7 @@ fn p_func_call_arg_list(pair: Pair<Rule>) -> Vec<syntax::Expr> {
         }
     }
 
-    args
+    loc.attach(args)
 }
 
 // Utils
@@ -302,4 +336,35 @@ fn get_inner_pair(expect_rule: Rule, pair: Pair<Rule>) -> Pair<Rule> {
         )
     }
     pairs.next().unwrap()
+}
+
+fn pairs_to_loc(pairs: &Pairs<Rule>) -> SrcLoc {
+    let start = pairs.clone().next().unwrap().as_span().start_pos().pos();
+    let end = pairs.clone().last().unwrap().as_span().end_pos().pos();
+    let len = end - start;
+
+    SrcLoc::Known(Span {
+        start: Pos {
+            offset: start as usize,
+        },
+        length: len as usize,
+    })
+}
+
+fn pair_to_loc(pair: &Pair<Rule>) -> SrcLoc {
+    let span = pair.as_span();
+    span_to_loc(&span)
+}
+
+fn span_to_loc(span: &pest::Span) -> SrcLoc {
+    let start = span.start_pos().pos();
+    let end = span.end_pos().pos();
+    let len = end - start;
+
+    SrcLoc::Known(Span {
+        start: Pos {
+            offset: start as usize,
+        },
+        length: len as usize,
+    })
 }

@@ -1,4 +1,5 @@
-mod parser;
+pub mod located;
+pub mod parser;
 pub mod syntax;
 
 extern crate pest;

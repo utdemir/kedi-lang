@@ -65,9 +65,15 @@ impl<T: SExpr> SExpr for Vec<T> {
     }
 }
 
-impl SExpr for i64 {
+impl SExpr for i32 {
     fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::Number(*self)
+        SExprTerm::number(*self)
+    }
+}
+
+impl SExpr for u32 {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::number(*self)
     }
 }
 

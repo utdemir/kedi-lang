@@ -113,7 +113,7 @@ impl SExpr for Assignment {
 pub enum AssignmentValue {
     Call(plain::GlobalIdentifier, Vec<Identifier>),
     Identifier(Identifier),
-    LiteralNumber(i64),
+    LiteralNumber(i32),
 }
 
 impl SExpr for AssignmentValue {

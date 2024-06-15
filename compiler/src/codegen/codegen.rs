@@ -50,7 +50,7 @@ fn codegen_function(input: &simple::FunDecl) -> wast::core::Func {
 
                 match value {
                     simple::AssignmentValue::LiteralNumber(i) => {
-                        instructions.push(wast::core::Instruction::I64Const(*i));
+                        instructions.push(wast::core::Instruction::I32Const(*i));
                     }
                     &simple::AssignmentValue::Identifier(ref id) => {
                         instructions.push(wast::core::Instruction::LocalGet(
@@ -83,7 +83,6 @@ fn codegen_function(input: &simple::FunDecl) -> wast::core::Func {
                             },
                         )));
                     }
-                    otherwise => todo!("{:?}", otherwise),
                 }
 
                 instructions.push(wast::core::Instruction::LocalSet(simple_identifier_to_uid(
