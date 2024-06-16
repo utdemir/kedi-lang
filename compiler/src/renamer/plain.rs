@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::parser::located::*;
 use crate::parser::syntax;
-use crate::pp::{SExpr, SExprTerm};
+use crate::util::loc::Located;
+use crate::util::pp::{SExpr, SExprTerm};
 
 #[derive(Debug, Copy, Eq, PartialEq, Hash, Clone)]
 pub enum Identifier {

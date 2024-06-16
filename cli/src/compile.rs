@@ -1,5 +1,5 @@
 use crate::args::CompileArgs;
-use kedi_lang::pp;
+use kedi_lang::util;
 
 pub fn compile(opts: CompileArgs) {
     // Read input file.
@@ -33,7 +33,7 @@ pub fn compile(opts: CompileArgs) {
     opts.out.write(wasm.bytes).expect("Could not write file");
 }
 
-fn write_sexpr<T: pp::SExpr>(sexpr: &T, path: &patharg::OutputArg) {
-    path.write(pp::print(sexpr, &pp::Options::default()) + "\n")
+fn write_sexpr<T: util::pp::SExpr>(sexpr: &T, path: &patharg::OutputArg) {
+    path.write(util::pp::print(sexpr, &util::pp::Options::default()) + "\n")
         .expect("Could not write file");
 }

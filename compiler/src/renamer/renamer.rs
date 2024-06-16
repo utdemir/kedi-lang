@@ -1,10 +1,9 @@
 use bimap::BiHashMap;
-use wast::kw::param;
-
-use crate::parser::syntax::{self, SrcLoc};
-use crate::renamer::plain;
-
 use std::collections::HashMap;
+
+use crate::parser::syntax;
+use crate::renamer::plain;
+use crate::util::loc::SrcLoc;
 
 pub fn rename(input: &syntax::Module) -> plain::Module {
     let mut ret = vec![];

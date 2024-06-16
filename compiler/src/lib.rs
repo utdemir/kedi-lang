@@ -1,4 +1,4 @@
-pub mod pp;
+pub mod util;
 
 pub mod codegen;
 pub mod parser;

@@ -5,9 +5,9 @@ pub fn run(input: &simple::Module) -> WasmBytes {
     let mut fields = vec![];
 
     for stmt in input.statements.iter() {
-        match stmt {
+        match &stmt.value {
             simple::TopLevelStmt::FunDecl(fun) => {
-                let fun = codegen_function(&fun);
+                let fun = codegen_function(&fun.value);
                 let field = wast::core::ModuleField::Func(fun);
                 fields.push(field);
             }
@@ -31,14 +31,22 @@ fn codegen_function(input: &simple::FunDecl) -> wast::core::Func {
 
     let mut locals = vec![];
 
-    for stmt in input.implementation.body.iter() {
-        match stmt {
-            simple::Statement::Assignment(simple::Assignment { target, value }) => {
-                let t = simple_identifier_to_id(target);
+    for stmt in input.implementation.value.body.value.iter() {
+        match &stmt.value {
+            simple::Statement::Assignment(l_assignment) => {
+                let simple::Assignment {
+                    value: l_value,
+                    target: l_target,
+                } = l_assignment;
+
+                let value = &l_value.value;
+                let target = &l_target.value;
+
+                let t = simple_identifier_to_id(&target);
 
                 match target {
                     simple::Identifier::SingleUse { .. }
-                    | &simple::Identifier::Plain(plain::Identifier::Local(_)) => {
+                    | simple::Identifier::Plain(plain::Identifier::Local(_)) => {
                         locals.push(wast::core::Local {
                             id: Some(t),
                             name: None,
@@ -52,15 +60,21 @@ fn codegen_function(input: &simple::FunDecl) -> wast::core::Func {
                     simple::AssignmentValue::LiteralNumber(i) => {
                         instructions.push(wast::core::Instruction::I32Const(*i));
                     }
-                    &simple::AssignmentValue::Identifier(ref id) => {
+                    simple::AssignmentValue::Identifier(ref id) => {
                         instructions.push(wast::core::Instruction::LocalGet(
                             simple_identifier_to_uid(id),
                         ));
                     }
-                    &simple::AssignmentValue::Call(ref id, ref args) => {
+                    simple::AssignmentValue::Call(simple::Call {
+                        fun_name: l_fun_name,
+                        arguments: l_arguments,
+                    }) => {
+                        let id = l_fun_name.value;
+                        let args = &l_arguments.value;
+
                         for arg in args.iter() {
                             instructions.push(wast::core::Instruction::LocalGet(
-                                simple_identifier_to_uid(arg),
+                                simple_identifier_to_uid(&arg.value),
                             ));
                         }
 
@@ -86,7 +100,7 @@ fn codegen_function(input: &simple::FunDecl) -> wast::core::Func {
                 }
 
                 instructions.push(wast::core::Instruction::LocalSet(simple_identifier_to_uid(
-                    target,
+                    &target,
                 )));
             }
             simple::Statement::Return(id) => {
@@ -105,18 +119,20 @@ fn codegen_function(input: &simple::FunDecl) -> wast::core::Func {
         id: None,
         name: None,
         exports: wast::core::InlineExport {
-            names: vec![&input.name.name],
+            names: vec![&input.name.value.name],
         },
         ty: wast::core::TypeUse {
             index: None,
             inline: Some(wast::core::FunctionType {
                 params: input
                     .implementation
+                    .value
                     .parameters
+                    .value
                     .iter()
                     .map(|x| {
                         (
-                            Some(local_identifier_to_id(x)),
+                            Some(local_identifier_to_id(&x.value)),
                             None,
                             wast::core::ValType::I32,
                         )

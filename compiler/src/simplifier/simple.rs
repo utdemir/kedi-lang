@@ -1,9 +1,11 @@
+use crate::util::loc::{Located, Tagged};
 use std::collections::HashMap;
 
 use crate::{
     parser::syntax,
-    pp::{SExpr, SExprTerm},
     renamer::plain,
+    util::loc,
+    util::pp::{SExpr, SExprTerm},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -34,7 +36,7 @@ impl SExpr for Identifier {
 
 #[derive(Clone, Debug)]
 pub struct Module {
-    pub statements: Vec<TopLevelStmt>,
+    pub statements: Vec<Located<TopLevelStmt>>,
 }
 
 impl SExpr for Module {
@@ -48,7 +50,7 @@ impl SExpr for Module {
 
 #[derive(Clone, Debug)]
 pub enum TopLevelStmt {
-    FunDecl(FunDecl),
+    FunDecl(Located<FunDecl>),
 }
 
 impl SExpr for TopLevelStmt {
@@ -61,8 +63,9 @@ impl SExpr for TopLevelStmt {
 
 #[derive(Clone, Debug)]
 pub struct FunDecl {
-    pub name: syntax::Identifier,
-    pub implementation: FunImpl,
+    pub name: Located<syntax::Identifier>,
+    pub implementation: Located<FunImpl>,
+    pub tag_map: loc::TagMap,
     pub refs: HashMap<plain::GlobalIdentifier, syntax::Identifier>,
 }
 
@@ -77,8 +80,8 @@ impl SExpr for FunDecl {
 
 #[derive(Clone, Debug)]
 pub struct FunImpl {
-    pub parameters: Vec<plain::LocalIdentifier>,
-    pub body: Vec<Statement>,
+    pub parameters: Tagged<Vec<Tagged<plain::LocalIdentifier>>>,
+    pub body: Tagged<Vec<Tagged<Statement>>>,
 }
 
 impl SExpr for FunImpl {
@@ -87,17 +90,17 @@ impl SExpr for FunImpl {
             SExprTerm::atom("fun_impl"),
             SExprTerm::call(
                 "parameters",
-                self.parameters.iter().map(|x| x.to_sexpr()).collect(),
+                self.parameters.value.iter().map(|x| x.to_sexpr()).collect(),
             ),
-            SExprTerm::List(self.body.iter().map(|x| x.to_sexpr()).collect()),
+            SExprTerm::List(self.body.value.iter().map(|x| x.to_sexpr()).collect()),
         ])
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Assignment {
-    pub target: Identifier,
-    pub value: AssignmentValue,
+    pub target: Tagged<Identifier>,
+    pub value: Tagged<AssignmentValue>,
 }
 
 impl SExpr for Assignment {
@@ -110,8 +113,23 @@ impl SExpr for Assignment {
 }
 
 #[derive(Clone, Debug)]
+pub struct Call {
+    pub fun_name: Tagged<plain::GlobalIdentifier>,
+    pub arguments: Tagged<Vec<Tagged<Identifier>>>,
+}
+
+impl SExpr for Call {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::call(
+            "call",
+            vec![self.fun_name.to_sexpr(), self.arguments.to_sexpr()],
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum AssignmentValue {
-    Call(plain::GlobalIdentifier, Vec<Identifier>),
+    Call(Call),
     Identifier(Identifier),
     LiteralNumber(i32),
 }
@@ -119,11 +137,7 @@ pub enum AssignmentValue {
 impl SExpr for AssignmentValue {
     fn to_sexpr(&self) -> SExprTerm {
         match self {
-            AssignmentValue::Call(f, a) => SExprTerm::List(vec![
-                SExprTerm::Atom("call".to_string()),
-                f.to_sexpr(),
-                a.to_sexpr(),
-            ]),
+            AssignmentValue::Call(c) => c.to_sexpr(),
             AssignmentValue::Identifier(v) => v.to_sexpr(),
             AssignmentValue::LiteralNumber(n) => {
                 SExprTerm::call("lit_number", vec![SExprTerm::number(*n)])

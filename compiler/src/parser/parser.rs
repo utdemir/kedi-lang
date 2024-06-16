@@ -8,7 +8,7 @@ use pest::{
 };
 use pest_derive::Parser;
 
-use super::located::*;
+use crate::util::loc::*;
 
 #[derive(Parser)]
 #[grammar = "parser/kedi-lang.pest"]

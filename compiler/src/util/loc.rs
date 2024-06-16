@@ -1,4 +1,8 @@
-use crate::pp::{SExpr, SExprTerm};
+use std::collections::HashMap;
+
+use crate::util::pp::{SExpr, SExprTerm};
+
+// Location
 
 #[derive(Debug, Clone, Copy)]
 pub struct Located<T> {
@@ -33,9 +37,17 @@ impl<T> Located<T> {
             location: self.location,
         }
     }
+
+    pub fn to_tagged(self, tag_map: &mut TagMap) -> Tagged<T> {
+        let tag = tag_map.get_tag(self.location);
+        Tagged {
+            value: self.value,
+            tag,
+        }
+    }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Pos {
     pub offset: usize,
 }
@@ -46,7 +58,7 @@ impl SExpr for Pos {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
     pub start: Pos,
     pub length: usize,
@@ -100,6 +112,87 @@ impl SrcLoc {
             (SrcLoc::Known(a), SrcLoc::Unknown) => SrcLoc::Known(*a),
             (SrcLoc::Unknown, SrcLoc::Known(b)) => SrcLoc::Known(*b),
             _ => SrcLoc::Unknown,
+        }
+    }
+
+    pub fn all_enclosing(locs: &[SrcLoc]) -> SrcLoc {
+        locs.iter()
+            .fold(SrcLoc::Unknown, |acc, &loc| SrcLoc::enclosing(&acc, &loc))
+    }
+
+    pub fn to_tag(self, tag_map: &mut TagMap) -> Tag {
+        tag_map.get_tag(self)
+    }
+}
+
+// Tags
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Tag {
+    pub value: u32,
+}
+
+impl SExpr for Tag {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::call("tag", vec![SExprTerm::Number(self.value as i64)])
+    }
+}
+
+impl Tag {
+    pub fn attach<T>(&self, value: T) -> Tagged<T> {
+        Tagged { value, tag: *self }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Tagged<T> {
+    pub value: T,
+    pub tag: Tag,
+}
+
+impl<T: SExpr> SExpr for Tagged<T> {
+    fn to_sexpr(&self) -> SExprTerm {
+        self.value.to_sexpr()
+    }
+}
+
+impl<T> Tagged<T> {
+    pub fn map<U, F: FnOnce(&T) -> U>(&self, f: F) -> Tagged<U> {
+        Tagged {
+            value: f(&self.value),
+            tag: self.tag,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TagMap {
+    next_tag: u32,
+    map: HashMap<Tag, SrcLoc>,
+}
+
+impl TagMap {
+    pub fn new() -> TagMap {
+        TagMap {
+            next_tag: 0,
+            map: HashMap::new(),
+        }
+    }
+
+    pub fn get_tag(&mut self, loc: SrcLoc) -> Tag {
+        let tag = Tag {
+            value: self.next_tag,
+        };
+        self.next_tag += 1;
+        self.map.insert(tag, loc);
+
+        tag
+    }
+
+    pub fn resolve_tag(&self, tag: Tag) -> SrcLoc {
+        match self.map.get(&tag) {
+            Some(loc) => *loc,
+            None => SrcLoc::Unknown,
         }
     }
 }
