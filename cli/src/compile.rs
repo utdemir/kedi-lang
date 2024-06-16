@@ -1,7 +1,7 @@
 use crate::args::CompileArgs;
-use kedi_lang::util;
+use kedi_lang::{error::annotate_error, util};
 
-pub fn compile(opts: CompileArgs) {
+pub fn compile(opts: CompileArgs) -> Result<(), miette::Report> {
     // Read input file.
     let contents = opts.entry.read_to_string().expect("Could not read file");
 
@@ -10,7 +10,8 @@ pub fn compile(opts: CompileArgs) {
         write_sexpr(&syntax, &out_syntax)
     }
 
-    let plain = kedi_lang::renamer::rename(&syntax);
+    let plain = kedi_lang::renamer::rename(&syntax).map_err(|e| annotate_error(e, contents))?;
+
     if let Some(out_plain) = opts.out_plain {
         write_sexpr(&plain, &out_plain)
     }
@@ -31,6 +32,8 @@ pub fn compile(opts: CompileArgs) {
     }
 
     opts.out.write(wasm.bytes).expect("Could not write file");
+
+    Ok(())
 }
 
 fn write_sexpr<T: util::pp::SExpr>(sexpr: &T, path: &patharg::OutputArg) {

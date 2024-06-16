@@ -38,7 +38,6 @@ pub fn simply_fun_impl(fun: &plain::FunImpl) -> (simple::FunImpl, loc::TagMap) {
     let mut state = SimplifyFunImplState::new();
 
     for stmt in fun.body.value.iter() {
-        let stmt_loc = stmt.location;
         match &stmt.value {
             plain::FunStatement::Return(expr) => {
                 let body = state.push_expr(&expr.value);

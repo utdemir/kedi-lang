@@ -7,4 +7,5 @@ default-run = "kedi"
 [dependencies]
 clap = { version = "4.5.4", features = ["derive"] }
 kedi-lang = { path = "../compiler" }
+miette = { version = "7.2.0", features = ["fancy"] }
 patharg = "0.4.0"

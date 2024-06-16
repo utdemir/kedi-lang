@@ -1,6 +1,5 @@
 use core::panic;
 
-use crate::parser;
 use crate::parser::syntax;
 use pest::{
     iterators::{Pair, Pairs},

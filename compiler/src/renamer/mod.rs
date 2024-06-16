@@ -1,4 +1,4 @@
 pub mod plain;
 mod renamer;
 
-pub use renamer::rename;
+pub use renamer::*;

@@ -1,4 +1,3 @@
-use kedi_lang::parser;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

@@ -1,14 +1,14 @@
 use wasmparser;
 use wasmtime;
 
-pub fn validate_wasm(wasm: &[u8]) {
+pub fn assert_valid_wasm(wasm: &[u8]) {
     wasmparser::validate(wasm).expect("invalid wasm");
 }
 
-fn execute_wasm(wasm: &str, export: &str, inputs: Vec<i32>) -> i32 {
+pub fn execute_wasm(wasm: &str, export: &str, inputs: Vec<i32>) -> i32 {
     let engine = wasmtime::Engine::default();
     let module = wasmtime::Module::new(&engine, wasm).unwrap();
-    let mut linker = wasmtime::Linker::new(&engine);
+    let linker = wasmtime::Linker::new(&engine);
     let mut store = wasmtime::Store::new(&engine, ());
     let instance = linker.instantiate(&mut store, &module).unwrap();
     let fun = instance.get_func(&mut store, export).unwrap();

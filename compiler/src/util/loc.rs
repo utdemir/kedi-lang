@@ -45,6 +45,16 @@ impl<T> Located<T> {
             tag,
         }
     }
+
+    pub fn map_result<U, E, F: FnOnce(&T) -> Result<U, E>>(&self, f: F) -> Result<Located<U>, E> {
+        match f(&self.value) {
+            Ok(value) => Ok(Located {
+                value,
+                location: self.location,
+            }),
+            Err(err) => Err(err),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -102,7 +112,7 @@ impl SrcLoc {
     pub fn attach<T>(&self, value: T) -> Located<T> {
         Located {
             value,
-            location: SrcLoc::Unknown,
+            location: *self,
         }
     }
 
