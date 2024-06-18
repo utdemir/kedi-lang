@@ -13,10 +13,14 @@ use crate::util::loc::*;
 #[grammar = "parser/kedi-lang.pest"]
 pub struct KediParser;
 
-pub fn parse(src: &str) -> Result<syntax::Module, String> {
+pub fn parse(src: &str) -> Result<syntax::Module, Error> {
     let successful_parse = KediParser::parse(Rule::module, src);
-    let module = p_module(successful_parse.unwrap().into_iter().next().unwrap());
-    Ok(module)
+    match successful_parse {
+        Ok(p) => Ok(p_module(p.into_iter().next().unwrap())),
+        Err(e) => Err(Error::ParseFailed(ParseError {
+            text: format!("{}", e),
+        })),
+    }
 }
 
 fn p_module(pair: Pair<Rule>) -> syntax::Module {
@@ -366,4 +370,14 @@ fn span_to_loc(span: &pest::Span) -> SrcLoc {
         },
         length: len as usize,
     })
+}
+
+#[derive(Debug)]
+pub enum Error {
+    ParseFailed(ParseError),
+}
+
+#[derive(Debug)]
+pub struct ParseError {
+    pub text: String,
 }

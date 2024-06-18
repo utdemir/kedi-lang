@@ -1,5 +1,4 @@
 fn id(fst: Number): Number {
     let a = 99;
-    let a  = 100;
     return fst;
 }

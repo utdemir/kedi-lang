@@ -58,7 +58,11 @@ fn rename_function(input: &syntax::FunDecl) -> Result<plain::FunDecl, Error> {
             body,
             return_predicate: None,
         }),
-        refs: HashMap::new(),
+        refs: env
+            .globals
+            .iter()
+            .map(|(k, v)| (v.clone(), k.clone()))
+            .collect(),
     });
 }
 

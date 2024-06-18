@@ -1,29 +1,62 @@
-use crate::codegen::types::*;
+use super::fragment::{self, FunDecl, FunImpl};
 use crate::{renamer::plain, simplifier::simple};
 
-pub fn run(input: &simple::Module) -> WasmBytes {
-    let mut fields = vec![];
+// pub fn run(input: &simple::Module) -> WasmBytes {
+//     let mut fields = vec![];
+
+//     for stmt in input.statements.iter() {
+//         match &stmt.value {
+//             simple::TopLevelStmt::FunDecl(fun) => {
+//                 let fun = codegen_function(&fun.value);
+//                 let field = wast::core::ModuleField::Func(fun);
+//                 fields.push(field);
+//             }
+//         }
+//     }
+
+//     let mut module = wast::core::Module {
+//         span: empty_span(),
+//         id: None,
+//         name: None,
+//         kind: wast::core::ModuleKind::Text(fields),
+//     };
+
+//     let wat = module.encode().unwrap();
+
+//     return WasmBytes { bytes: wat };
+// }
+
+pub fn run(input: &simple::Module) -> fragment::Module {
+    let mut statements = vec![];
 
     for stmt in input.statements.iter() {
         match &stmt.value {
             simple::TopLevelStmt::FunDecl(fun) => {
-                let fun = codegen_function(&fun.value);
-                let field = wast::core::ModuleField::Func(fun);
-                fields.push(field);
+                let gen = codegen_function(&fun.value);
+                let f = fun.map(|fun| {
+                    return fragment::TopLevelStmt::FunDecl(FunDecl {
+                        name: fun.name.clone(),
+                        implementation: fun.implementation.location.attach(FunImpl {
+                            parameters: fun
+                                .implementation
+                                .value
+                                .parameters
+                                .value
+                                .iter()
+                                .map(|x| x.value)
+                                .collect(),
+                            body: gen,
+                        }),
+                        refs: fun.refs.clone(),
+                    });
+                });
+
+                statements.push(f);
             }
         }
     }
 
-    let mut module = wast::core::Module {
-        span: empty_span(),
-        id: None,
-        name: None,
-        kind: wast::core::ModuleKind::Text(fields),
-    };
-
-    let wat = module.encode().unwrap();
-
-    return WasmBytes { bytes: wat };
+    return fragment::Module { statements };
 }
 
 fn codegen_function(input: &simple::FunDecl) -> wast::core::Func {
@@ -114,10 +147,16 @@ fn codegen_function(input: &simple::FunDecl) -> wast::core::Func {
         }
     }
 
+    println!("name: {:?}", input.name.value.name.as_str());
     return wast::core::Func {
         span: empty_span(),
-        id: None,
-        name: None,
+        id: Some(wast::token::Id::new(
+            input.name.value.name.as_str(),
+            empty_span(),
+        )),
+        name: Some(wast::token::NameAnnotation {
+            name: input.name.value.name.as_str(),
+        }),
         exports: wast::core::InlineExport {
             names: vec![&input.name.value.name],
         },

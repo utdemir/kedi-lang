@@ -53,7 +53,7 @@ impl SExpr for Identifier {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunDecl {
     pub name: Located<syntax::Identifier>,
     pub implementation: Located<FunImpl>,
@@ -82,7 +82,7 @@ impl SExpr for FunDecl {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunImpl {
     pub parameters: Located<Vec<Located<FunParam>>>,
     pub return_predicate: Option<Located<Expr>>,
@@ -99,7 +99,7 @@ impl SExpr for FunImpl {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunParam {
     pub name: LocalIdentifier,
     pub predicate: Option<Expr>,
@@ -115,7 +115,7 @@ impl SExpr for FunParam {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     LitNumber(Located<i32>),
     LitString(Located<String>),
@@ -141,7 +141,7 @@ impl SExpr for Expr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunCall {
     pub name: Located<GlobalIdentifier>,
     pub arguments: Located<Vec<Located<Expr>>>,
@@ -157,7 +157,7 @@ impl SExpr for FunCall {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FunStatement {
     Return(Located<Expr>),
     Inv(Located<Expr>),
@@ -182,7 +182,7 @@ impl SExpr for FunStatement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LetDecl {
     pub name: Located<LocalIdentifier>,
     pub value: Located<Expr>,
@@ -198,7 +198,7 @@ impl SExpr for LetDecl {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct While {
     pub condition: Located<Expr>,
     pub body: Located<Vec<Located<FunStatement>>>,
@@ -214,7 +214,7 @@ impl SExpr for While {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Assignment {
     id: Located<LocalIdentifier>,
     value: Located<Expr>,
@@ -230,7 +230,7 @@ impl SExpr for Assignment {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TopLevelStatement {
     FunDecl(Located<FunDecl>),
 }
@@ -243,7 +243,7 @@ impl SExpr for TopLevelStatement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Module {
     pub statements: Vec<Located<TopLevelStatement>>,
 }

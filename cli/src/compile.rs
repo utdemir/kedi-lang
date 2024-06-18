@@ -21,7 +21,9 @@ pub fn compile(opts: CompileArgs) -> Result<(), miette::Report> {
         write_sexpr(&simple, &out_simple)
     }
 
-    let wasm = kedi_lang::codegen::run(&simple);
+    let fragment = kedi_lang::codegen::run(&simple);
+
+    let wasm = kedi_lang::linker::run(fragment);
 
     if let Some(out_wat) = opts.out_wat {
         let txt = match wasm.to_wat() {

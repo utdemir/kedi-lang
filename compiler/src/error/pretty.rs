@@ -1,11 +1,22 @@
 use miette;
 
 use super::core;
+use crate::parser;
 use crate::renamer;
 use crate::util::loc;
 
 pub fn annotate_error<T: Into<core::Error>>(error: T, src: String) -> miette::Report {
     let diagnostic: miette::MietteDiagnostic = match error.into() {
+        core::Error::Parser(p) => match p {
+            parser::Error::ParseFailed(err) => miette::MietteDiagnostic {
+                severity: Some(miette::Severity::Error),
+                code: None,
+                message: err.text,
+                help: None,
+                url: None,
+                labels: None,
+            },
+        },
         core::Error::Renamer(e) => match e {
             renamer::Error::IdentifierNotFound(err) => miette::MietteDiagnostic {
                 severity: Some(miette::Severity::Error),
