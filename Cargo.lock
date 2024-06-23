@@ -202,6 +202,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo-run-bin"
+version = "1.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94df695bdfe197c3289384cfc9ad50beacc6724a6d807d813bc891f8a2162af7"
+dependencies = [
+ "anyhow",
+ "cfg-if",
+ "clap",
+ "owo-colors 3.5.0",
+ "rustversion",
+ "serde",
+ "toml 0.5.11",
+ "toml_edit 0.19.15",
+ "version_check",
+ "which",
+]
+
+[[package]]
 name = "cargo_metadata"
 version = "0.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -234,9 +252,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "clap"
-version = "4.5.4"
+version = "4.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90bc066a67923782aa8515dbaea16946c5bcc5addbd668bb80af688e53e548a0"
+checksum = "5db83dced34638ad474f39f250d7fea9598bdd239eaced1bdf45d597da0f433f"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -244,9 +262,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.2"
+version = "4.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae129e2e766ae0ec03484e609954119f123cc1fe650337e155d03b022f24f7b4"
+checksum = "f7e204572485eb3fbf28f871612191521df159bc3e15a9f5064c66dba3a8c05f"
 dependencies = [
  "anstream",
  "anstyle",
@@ -256,9 +274,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.5.4"
+version = "4.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "528131438037fd55894f62d6e9f068b8f45ac57ffa77517819645d10aed04f64"
+checksum = "c780290ccf4fb26629baa7a1081e68ced113f1d3ec302fa5948f1c381ebf06c6"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -766,6 +784,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "home"
+version = "0.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3d1354bf6b7235cb4a0576c2619fd4ed18183f689b12b006a0ee7329eeff9a5"
+dependencies = [
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "id-arena"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1058,7 +1085,7 @@ dependencies = [
  "backtrace-ext",
  "cfg-if",
  "miette-derive",
- "owo-colors",
+ "owo-colors 4.0.0",
  "supports-color",
  "supports-hyperlinks",
  "supports-unicode",
@@ -1152,6 +1179,12 @@ dependencies = [
  "kedi-lang",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "owo-colors"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1b04fb49957986fdce4d6ee7a65027d55d4b6d2265e5848bbb507b58ccfdb6f"
 
 [[package]]
 name = "owo-colors"
@@ -1727,6 +1760,15 @@ dependencies = [
 
 [[package]]
 name = "toml"
+version = "0.5.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4f7f0dd8d50a853a531c426359045b1998f04219d88799810762cd4ad314234"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "toml"
 version = "0.8.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f49eb2ab21d2f26bd6db7bf383edc527a7ebaee412d17af4d40fdccd442f335"
@@ -1734,7 +1776,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "toml_edit",
+ "toml_edit 0.22.14",
 ]
 
 [[package]]
@@ -1748,6 +1790,17 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
+version = "0.19.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
+dependencies = [
+ "indexmap 2.2.6",
+ "toml_datetime",
+ "winnow 0.5.40",
+]
+
+[[package]]
+name = "toml_edit"
 version = "0.22.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f21c7aaf97f1bd9ca9d4f9e73b0a6c74bd5afef56f2bc931943a6e1c37e04e38"
@@ -1756,7 +1809,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "winnow",
+ "winnow 0.6.13",
 ]
 
 [[package]]
@@ -2275,7 +2328,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "sha2",
- "toml",
+ "toml 0.8.14",
  "windows-sys 0.52.0",
  "zstd",
 ]
@@ -2491,6 +2544,18 @@ checksum = "77afa9a11836342370f4817622a2f0f418b134426d91a82dfb48f532d2ec13ef"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "which"
+version = "4.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87ba24419a2078cd2b0f2ede2691b6c66d8e47836da3b6db8265ebad47afbfc7"
+dependencies = [
+ "either",
+ "home",
+ "once_cell",
+ "rustix",
 ]
 
 [[package]]
@@ -2748,6 +2813,15 @@ checksum = "bec47e5bfd1bff0eeaf6d8b485cc1074891a197ab4225d504cb7a1ab88b02bf0"
 
 [[package]]
 name = "winnow"
+version = "0.5.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f593a95398737aeed53e489c785df13f3618e41dbcd6718c6addbf1395aa6876"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
+name = "winnow"
 version = "0.6.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59b5e5f6c299a3c7890b876a2a587f3115162487e704907d9b6cd29473052ba1"
@@ -2777,6 +2851,8 @@ dependencies = [
 name = "xtask"
 version = "0.1.0"
 dependencies = [
+ "cargo-run-bin",
+ "clap",
  "xtask-wasm",
 ]
 

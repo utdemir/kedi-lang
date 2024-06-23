@@ -1,3 +1,4 @@
+#[cfg(test)]
 mod util;
 
 use test_each_file::test_each_file;

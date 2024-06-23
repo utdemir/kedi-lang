@@ -1,3 +1,4 @@
+#[cfg(test)]
 mod util;
 
 mk_tests! {

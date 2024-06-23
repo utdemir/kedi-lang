@@ -6,3 +6,6 @@ members = [
     "online",
     "xtask"
 ]
+
+[workspace.metadata.bin]
+cargo-nextest = { version = "0.9.72" }
