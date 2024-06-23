@@ -5,12 +5,14 @@ pub fn compile(opts: CompileArgs) -> Result<(), miette::Report> {
     // Read input file.
     let contents = opts.entry.read_to_string().expect("Could not read file");
 
-    let syntax = kedi_lang::parser::parse(&contents).expect("Could not parse file");
+    let syntax =
+        kedi_lang::parser::parse(&contents).map_err(|e| annotate_error(e, contents.clone()))?;
     if let Some(out_syntax) = opts.out_syntax {
         write_sexpr(&syntax, &out_syntax)
     }
 
-    let plain = kedi_lang::renamer::rename(&syntax).map_err(|e| annotate_error(e, contents))?;
+    let plain =
+        kedi_lang::renamer::rename(&syntax).map_err(|e| annotate_error(e, contents.clone()))?;
 
     if let Some(out_plain) = opts.out_plain {
         write_sexpr(&plain, &out_plain)
@@ -22,6 +24,9 @@ pub fn compile(opts: CompileArgs) -> Result<(), miette::Report> {
     }
 
     let fragment = kedi_lang::codegen::run(&simple);
+    if let Some(out_fragment) = opts.out_fragment {
+        write_sexpr(&fragment, &out_fragment)
+    }
 
     let wasm = kedi_lang::linker::run(fragment);
 

@@ -63,7 +63,7 @@ pub enum Expr {
     LitString(Located<String>),
     ValueIdentifier(Located<Identifier>),
     FunCall(Located<FunCall>),
-    Op(Box<Located<Expr>>, Identifier, Box<Located<Expr>>),
+    Op(Box<Located<Expr>>, Located<Identifier>, Box<Located<Expr>>),
 }
 
 impl SExpr for Expr {
@@ -74,7 +74,7 @@ impl SExpr for Expr {
             Expr::ValueIdentifier(ref x) => x.to_sexpr(),
             Expr::FunCall(ref x) => x.to_sexpr(),
             Expr::Op(ref a, ref op, ref b) => SExprTerm::List(vec![
-                SExprTerm::Atom(op.name.clone()),
+                SExprTerm::Atom(op.value.name.clone()),
                 a.to_sexpr(),
                 b.to_sexpr(),
             ]),
@@ -112,12 +112,43 @@ impl SExpr for TopLevelStatement {
 }
 
 #[derive(Debug, Clone)]
+pub struct InlineWasm {
+    pub input_stack: Located<Vec<Located<Identifier>>>,
+    pub output_stack: Located<Vec<Located<Identifier>>>,
+    pub wasm: Located<wast::core::Instruction<'static>>,
+}
+
+impl SExpr for InlineWasm {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::List(vec![
+            SExprTerm::Atom("inline_wasm".to_string()),
+            SExprTerm::List(
+                self.input_stack
+                    .value
+                    .iter()
+                    .map(|x| x.to_sexpr())
+                    .collect(),
+            ),
+            SExprTerm::List(
+                self.output_stack
+                    .value
+                    .iter()
+                    .map(|x| x.to_sexpr())
+                    .collect(),
+            ),
+            SExprTerm::Atom(format!("{:?}", self.wasm.value)),
+        ])
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum FunStatement {
     Return(Located<Return>),
     Inv(Located<Inv>),
     LetDecl(Located<LetDecl>),
     While(Located<While>),
     Assignment(Located<Assignment>),
+    InlineWasm(Located<InlineWasm>),
 }
 
 impl SExpr for FunStatement {
@@ -128,6 +159,7 @@ impl SExpr for FunStatement {
             FunStatement::LetDecl(ref x) => x.to_sexpr(),
             FunStatement::While(ref x) => x.to_sexpr(),
             FunStatement::Assignment(ref x) => x.to_sexpr(),
+            FunStatement::InlineWasm(ref x) => x.to_sexpr(),
         }
     }
 }
@@ -179,7 +211,7 @@ impl SExpr for LetDecl {
 #[derive(Debug, Clone)]
 pub struct While {
     pub condition: Located<Expr>,
-    pub body: Vec<Located<FunStatement>>,
+    pub body: Located<Vec<Located<FunStatement>>>,
 }
 
 impl SExpr for While {
@@ -187,7 +219,7 @@ impl SExpr for While {
         SExprTerm::List(vec![
             SExprTerm::Atom("while".to_string()),
             self.condition.to_sexpr(),
-            SExprTerm::List(self.body.iter().map(|x| x.to_sexpr()).collect()),
+            SExprTerm::List(self.body.value.iter().map(|x| x.to_sexpr()).collect()),
         ])
     }
 }

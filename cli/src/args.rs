@@ -28,6 +28,8 @@ pub struct CompileArgs {
     #[arg(long)]
     pub out_simple: Option<patharg::OutputArg>,
     #[arg(long)]
+    pub out_fragment: Option<patharg::OutputArg>,
+    #[arg(long)]
     pub out_wat: Option<patharg::OutputArg>,
 }
 

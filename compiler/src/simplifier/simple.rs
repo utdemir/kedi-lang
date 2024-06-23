@@ -8,7 +8,7 @@ use crate::{
     util::pp::{SExpr, SExprTerm},
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct SingleUseIdentifier {
     pub id: u32,
 }
@@ -19,7 +19,7 @@ impl SExpr for SingleUseIdentifier {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Identifier {
     Plain(plain::Identifier),
     SingleUse(SingleUseIdentifier),
@@ -73,7 +73,17 @@ impl SExpr for FunDecl {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::call(
             "fun_decl",
-            vec![self.name.to_sexpr(), self.implementation.to_sexpr()],
+            vec![
+                self.name.to_sexpr(),
+                SExprTerm::call(
+                    "refs",
+                    self.refs
+                        .iter()
+                        .map(|(k, v)| SExprTerm::call("ref", vec![k.to_sexpr(), v.to_sexpr()]))
+                        .collect(),
+                ),
+                SExprTerm::call("implementation", vec![self.implementation.to_sexpr()]),
+            ],
         )
     }
 }
@@ -148,7 +158,7 @@ impl SExpr for AssignmentValue {
 
 #[derive(Clone, Debug)]
 pub struct Label {
-    id: u32,
+    pub id: u32,
 }
 
 impl SExpr for Label {
@@ -158,20 +168,106 @@ impl SExpr for Label {
 }
 
 #[derive(Clone, Debug)]
+pub struct If {
+    pub condition: Tagged<Identifier>,
+    pub then: Tagged<Vec<Tagged<Statement>>>,
+    pub else_: Tagged<Vec<Tagged<Statement>>>,
+}
+
+impl SExpr for If {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::call(
+            "if",
+            vec![
+                self.condition.to_sexpr(),
+                SExprTerm::call(
+                    "then",
+                    self.then.value.iter().map(|x| x.to_sexpr()).collect(),
+                ),
+                SExprTerm::call(
+                    "else",
+                    self.else_.value.iter().map(|x| x.to_sexpr()).collect(),
+                ),
+            ],
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Loop {
+    pub label: Label,
+    pub body: Tagged<Vec<Tagged<Statement>>>,
+}
+
+impl SExpr for Loop {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::call(
+            "loop",
+            vec![
+                self.label.to_sexpr(),
+                SExprTerm::call(
+                    "body",
+                    self.body.value.iter().map(|x| x.to_sexpr()).collect(),
+                ),
+            ],
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct InlineWasm {
+    pub input_stack: Tagged<Vec<Tagged<Identifier>>>,
+    pub output_stack: Tagged<Vec<Tagged<Identifier>>>,
+    pub wasm: Tagged<wast::core::Instruction<'static>>,
+}
+
+impl SExpr for InlineWasm {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::List(vec![
+            SExprTerm::Atom("inline_wasm".to_string()),
+            SExprTerm::List(
+                self.input_stack
+                    .value
+                    .iter()
+                    .map(|x| x.to_sexpr())
+                    .collect(),
+            ),
+            SExprTerm::List(
+                self.output_stack
+                    .value
+                    .iter()
+                    .map(|x| x.to_sexpr())
+                    .collect(),
+            ),
+            SExprTerm::Atom(format!("{:?}", self.wasm.value)),
+        ])
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum Statement {
-    Loop(Label),
+    // Loop(Label),
+    Loop(Loop),
     Assignment(Assignment),
     Branch(Label),
+    Break(Label),
     Return(Identifier),
+    If(If),
+    InlineWasm(InlineWasm),
+    Nop,
 }
 
 impl SExpr for Statement {
     fn to_sexpr(&self) -> SExprTerm {
         match self {
-            Statement::Loop(l) => SExprTerm::call("loop", vec![l.to_sexpr()]),
+            Statement::Loop(l) => l.to_sexpr(),
             Statement::Assignment(a) => a.to_sexpr(),
             Statement::Branch(l) => SExprTerm::call("branch", vec![l.to_sexpr()]),
+            Statement::Break(l) => SExprTerm::call("break", vec![l.to_sexpr()]),
             Statement::Return(i) => SExprTerm::call("return", vec![i.to_sexpr()]),
+            Statement::If(i) => i.to_sexpr(),
+            Statement::Nop => SExprTerm::atom("nop"),
+            Statement::InlineWasm(i) => i.to_sexpr(),
         }
     }
 }

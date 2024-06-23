@@ -5,7 +5,7 @@ pub fn assert_valid_wasm(wasm: &[u8]) {
     wasmparser::validate(wasm).expect("invalid wasm");
 }
 
-pub fn execute_wasm(wasm: &str, export: &str, inputs: Vec<i32>) -> i32 {
+pub fn execute_wasm(wasm: &[u8], export: &str, inputs: &[i32]) -> i32 {
     let engine = wasmtime::Engine::default();
     let module = wasmtime::Module::new(&engine, wasm).unwrap();
     let linker = wasmtime::Linker::new(&engine);

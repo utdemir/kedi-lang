@@ -16,28 +16,28 @@ pub struct KediParser;
 pub fn parse(src: &str) -> Result<syntax::Module, Error> {
     let successful_parse = KediParser::parse(Rule::module, src);
     match successful_parse {
-        Ok(p) => Ok(p_module(p.into_iter().next().unwrap())),
+        Ok(p) => Ok(p_module(p.into_iter().next().unwrap())?),
         Err(e) => Err(Error::ParseFailed(ParseError {
             text: format!("{}", e),
         })),
     }
 }
 
-fn p_module(pair: Pair<Rule>) -> syntax::Module {
+fn p_module(pair: Pair<Rule>) -> Result<syntax::Module, Error> {
     let inner = get_inner_pairs(Rule::module, pair);
 
     let mut statements = vec![];
     for i in inner {
         match i.as_rule() {
             Rule::EOI => continue,
-            Rule::top_level_stmt => statements.push(p_top_level_stmt(i)),
+            Rule::top_level_stmt => statements.push(p_top_level_stmt(i)?),
             otherwise => panic!("Unexpected rule in module: {:?}", otherwise),
         };
     }
-    syntax::Module { statements }
+    Ok(syntax::Module { statements })
 }
 
-fn p_top_level_stmt(pair: Pair<Rule>) -> Located<syntax::TopLevelStatement> {
+fn p_top_level_stmt(pair: Pair<Rule>) -> Result<Located<syntax::TopLevelStatement>, Error> {
     let top_loc = pair_to_loc(&pair);
     let inner = get_inner_pair(Rule::top_level_stmt, pair);
 
@@ -72,30 +72,32 @@ fn p_top_level_stmt(pair: Pair<Rule>) -> Located<syntax::TopLevelStatement> {
                 Rule::block => {
                     let mut body = vec![];
                     for stmt in _body.into_inner() {
-                        body.push(p_fun_stmt(stmt));
+                        body.push(p_fun_stmt(stmt)?);
                     }
                     body
                 }
                 otherwise => panic!(
-                    "Unexpected rule in fun_decl (e∂xpecting block): {:?}",
+                    "Unexpected rule in fun_decl (expecting block): {:?}",
                     otherwise
                 ),
             };
 
-            return top_loc.attach(syntax::TopLevelStatement::FunDecl(top_loc.attach(
-                syntax::FunDecl {
-                    name,
-                    parameters,
-                    return_predicate: Some(return_predicate),
-                    body: body_loc.attach(body),
-                },
-            )));
+            return Ok(
+                top_loc.attach(syntax::TopLevelStatement::FunDecl(top_loc.attach(
+                    syntax::FunDecl {
+                        name,
+                        parameters,
+                        return_predicate: Some(return_predicate),
+                        body: body_loc.attach(body),
+                    },
+                ))),
+            );
         }
         otherwise => panic!("Unexpected rule in module: {:?}", otherwise),
     }
 }
 
-fn p_fun_stmt(pair: Pair<Rule>) -> Located<syntax::FunStatement> {
+fn p_fun_stmt(pair: Pair<Rule>) -> Result<Located<syntax::FunStatement>, Error> {
     let top_loc = pair_to_loc(&pair);
     let inner = get_inner_pair(Rule::fun_stmt, pair);
 
@@ -151,11 +153,12 @@ fn p_fun_stmt(pair: Pair<Rule>) -> Located<syntax::FunStatement> {
             };
 
             let _body = inner.next().unwrap();
+            let body_loc = pair_to_loc(&_body);
             let body = match _body.as_rule() {
                 Rule::block => {
                     let mut body = vec![];
                     for stmt in _body.into_inner() {
-                        body.push(p_fun_stmt(stmt));
+                        body.push(p_fun_stmt(stmt)?);
                     }
                     body
                 }
@@ -167,7 +170,7 @@ fn p_fun_stmt(pair: Pair<Rule>) -> Located<syntax::FunStatement> {
 
             syntax::FunStatement::While(loc.attach(syntax::While {
                 condition: predicate,
-                body: body,
+                body: body_loc.attach(body),
             }))
         }
         Rule::assignment => {
@@ -188,10 +191,53 @@ fn p_fun_stmt(pair: Pair<Rule>) -> Located<syntax::FunStatement> {
             syntax::FunStatement::Assignment(loc.attach(syntax::Assignment { name, value }))
         }
 
+        Rule::raw_wasm => {
+            let mut inner = inner.into_inner();
+            let loc = pairs_to_loc(&inner);
+
+            let input_stack = inner.next().unwrap();
+            let input_stack_loc = pair_to_loc(&input_stack);
+
+            let output_stack = inner.next().unwrap();
+            let output_stack_loc = pair_to_loc(&output_stack);
+
+            let instruction = inner.next().unwrap();
+            let instruction_loc = pair_to_loc(&instruction);
+
+            let input_stack = input_stack_loc.attach(
+                get_inner_pairs(Rule::value_identifier_list, input_stack)
+                    .map(|r| p_value_identifier(r))
+                    .collect(),
+            );
+
+            let output_stack = output_stack_loc.attach(
+                get_inner_pairs(Rule::value_identifier_list, output_stack)
+                    .map(|r| p_value_identifier(r))
+                    .collect(),
+            );
+
+            let wasm_s = ustr::ustr(instruction.as_str()).as_str();
+            let buf = Box::leak(Box::new(wast::parser::ParseBuffer::new(&wasm_s).unwrap()));
+
+            let wasm = wast::parser::parse::<wast::core::Instruction>(buf)
+                .map_err(|err| {
+                    Error::ParseFailed(ParseError {
+                        text: format!("Failed to parse wasm: {:?} ({:?})", wasm_s, err),
+                    })
+                })
+                .clone()?;
+
+            syntax::FunStatement::InlineWasm(loc.attach(syntax::InlineWasm {
+                input_stack,
+                output_stack,
+                wasm: instruction_loc.attach(wasm),
+            }))
+        }
+
         r => todo!("stmt: {:?}", r),
     };
 
-    top_loc.attach(stmt)
+    Ok(top_loc.attach(stmt))
 }
 
 fn p_value_identifier(pair: Pair<Rule>) -> Located<syntax::Identifier> {
@@ -266,6 +312,7 @@ fn p_op_expr(pair: Pair<Rule>) -> Located<syntax::Expr> {
 
     let left = p_pl_expr(inner.next().unwrap());
     let op = inner.next().unwrap();
+    let op_loc = pair_to_loc(&op);
     let right = p_expr(inner.next().unwrap());
 
     assert!(inner.next().is_none());
@@ -275,7 +322,7 @@ fn p_op_expr(pair: Pair<Rule>) -> Located<syntax::Expr> {
 
     return loc.attach(syntax::Expr::Op(
         Box::new(left),
-        syntax::Identifier { name: id },
+        op_loc.attach(syntax::Identifier { name: id }),
         Box::new(right),
     ));
 }
@@ -372,12 +419,12 @@ fn span_to_loc(span: &pest::Span) -> SrcLoc {
     })
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Error {
     ParseFailed(ParseError),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParseError {
     pub text: String,
 }

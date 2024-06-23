@@ -1,3 +1,4 @@
+pub mod optimizations;
 pub mod simple;
 mod simplifier;
 

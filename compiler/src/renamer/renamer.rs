@@ -89,6 +89,73 @@ fn rename_fun_statement(
             Ok(plain::FunStatement::Return(ret))
         }
 
+        syntax::FunStatement::While(while_stmt) => {
+            let ret = while_stmt.map_result(|while_stmt| {
+                let condition = while_stmt.condition.map(|c| rename_expr(env, &c));
+                let body = while_stmt.body.map_result(|body| {
+                    body.into_iter()
+                        .map(|stmt| stmt.map_result(|stmt| rename_fun_statement(env, &stmt)))
+                        .collect::<Result<Vec<_>, _>>()
+                })?;
+                Ok::<_, Error>(plain::While { condition, body })
+            })?;
+
+            Ok(plain::FunStatement::While(ret))
+        }
+
+        syntax::FunStatement::Assignment(assignment) => {
+            let ret = assignment.map_result(|assignment| {
+                let id = assignment
+                    .name
+                    .map_result(|lhs| match env.resolve_local(&lhs) {
+                        Some(x) => Ok(x),
+                        None => Err(IdentifierNotFoundError {
+                            identifier: assignment.name.clone(),
+                        }),
+                    })?;
+                let value = assignment.value.map(|rhs| rename_expr(env, &rhs));
+                Ok::<_, Error>(plain::Assignment { id, value })
+            })?;
+
+            Ok(plain::FunStatement::Assignment(ret))
+        }
+
+        syntax::FunStatement::InlineWasm(inline_wasm) => {
+            let ret = inline_wasm.map_result::<_, IdentifierNotFoundError, _>(|inline_wasm| {
+                let inputs = inline_wasm.input_stack.map_result(|xs| {
+                    xs.iter()
+                        .map(|l_x| {
+                            l_x.map_result(|x| {
+                                env.resolve_local(&x).ok_or(IdentifierNotFoundError {
+                                    identifier: l_x.clone(),
+                                })
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()
+                })?;
+
+                let outputs = inline_wasm.output_stack.map_result(|xs| {
+                    xs.iter()
+                        .map(|l_x| {
+                            l_x.map_result(|x| {
+                                env.resolve_local(&x).ok_or(IdentifierNotFoundError {
+                                    identifier: l_x.clone(),
+                                })
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()
+                })?;
+
+                Ok(plain::InlineWasm {
+                    input_stack: inputs,
+                    output_stack: outputs,
+                    wasm: inline_wasm.wasm.clone(),
+                })
+            })?;
+
+            Ok(plain::FunStatement::InlineWasm(ret))
+        }
+
         otherwise => unimplemented!("{:?}", otherwise),
     }
 }
@@ -99,7 +166,15 @@ fn rename_expr(env: &mut RenamerEnv, input: &syntax::Expr) -> plain::Expr {
         syntax::Expr::LitString(x) => plain::Expr::LitString(x.clone()),
         syntax::Expr::ValueIdentifier(x) => plain::Expr::ValueIdentifier(x.map(|x| env.resolve(x))),
         syntax::Expr::FunCall(x) => plain::Expr::FunCall(x.map(|x| rename_fun_call(env, x))),
-        otherwise => unimplemented!("rename_expr: {:?}", otherwise),
+        syntax::Expr::Op(lhs, op, rhs) => {
+            let loc = SrcLoc::all_enclosing(&[lhs.location, op.location, rhs.location]);
+            let fun = syntax::FunCall {
+                name: op.clone(),
+                arguments: SrcLoc::enclosing(&lhs.location, &rhs.location)
+                    .attach(vec![*lhs.to_owned(), *rhs.to_owned()]),
+            };
+            plain::Expr::FunCall(loc.attach(rename_fun_call(env, &fun)))
+        }
     }
 }
 
@@ -165,8 +240,12 @@ impl RenamerEnv {
         }
     }
 
+    fn resolve_local(&self, input: &syntax::Identifier) -> Option<plain::LocalIdentifier> {
+        self.locals.get_by_left(input).map(|x| x.clone())
+    }
+
     fn resolve(&mut self, input: &syntax::Identifier) -> plain::Identifier {
-        match self.locals.get_by_left(input) {
+        match self.resolve_local(input) {
             Some(x) => plain::Identifier::Local(x.clone()),
             None => plain::Identifier::Global(self.get_global(input)),
         }

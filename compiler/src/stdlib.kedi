@@ -1,0 +1,5 @@
+fn greater_than(left: Number, right: Number): Number {
+    let ret = 99;
+    %wasm [left, right] [ret] i32.gt;
+    return ret; 
+}

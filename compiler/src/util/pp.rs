@@ -49,6 +49,10 @@ impl SExprTerm {
                 .append(RcDoc::text(")")),
         }
     }
+
+    pub fn to_pretty_string(&self) -> String {
+        self.to_doc().pretty(80).to_string()
+    }
 }
 
 // Instances

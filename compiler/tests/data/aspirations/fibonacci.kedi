@@ -16,5 +16,3 @@ fn fibonacci(nth: PositiveNumber): PositiveNumber {
 
     return ret;
 }
-
-@ fibonacci(n) == fibonacci(n - 1) + fibonacci(n - 2);
