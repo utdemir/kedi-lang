@@ -1,7 +1,4 @@
-use crate::{
-    simplifier::{optimizations::prune_single_use, simple},
-    util::pp::SExpr,
-};
+use crate::simplifier::simple;
 
 pub fn run(impl_: &mut simple::FunImpl) {
     let mut body = &mut impl_.body.value;
