@@ -9,7 +9,7 @@ import { lazy } from 'solid-js';
 
 render(() =>
     <div class="container">
-        <Router>
+        <Router base={import.meta.env.BASE_URL}>
             <Route path="/" component={lazy(() => import("./pages/home"))} />
         </Router>
     </div>,
