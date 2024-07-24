@@ -51,7 +51,7 @@ impl SExprTerm {
     }
 
     pub fn to_pretty_string(&self) -> String {
-        self.to_doc().pretty(80).to_string()
+        self.to_doc().pretty(40).to_string()
     }
 }
 

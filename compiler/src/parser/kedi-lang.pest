@@ -11,7 +11,6 @@ placeholder_identifier = { "_" }
 value_identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
 
 func_call_arg_list = { "(" ~ (expr ~ ("," ~ expr)*)? ~ ")" }
-
 func_call = { value_identifier ~ func_call_arg_list }
 
 number_literal = { ASCII_DIGIT+ }
@@ -20,8 +19,9 @@ string_literal = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 
 literal = { number_literal | string_literal }
 
-op_chars = { "+" | "-" | "*" | "/" | "%" | "=" | "!" | "<" | ">" | "&" | "|" | "." }
-operator = { op_chars+ }
+op_initial_chars = @{ "+" | "-" | "*" | "/" | "%" | "!" | "<" | ">" | "&" | "|" | "?" }
+op_rest = @{ op_initial_chars | "=" | "." } 
+operator = @{ op_initial_chars ~ op_rest* }
 
 pl_expr = { 
     func_call | value_identifier | placeholder_identifier | literal |

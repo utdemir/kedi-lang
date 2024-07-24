@@ -3,3 +3,7 @@
 
 online/dist
 .bin
+
+node_modules
+website/dist
+website/assets/generated

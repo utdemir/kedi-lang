@@ -1,5 +1,5 @@
 [package]
-name = "online"
+name = "kedi-lang-web"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,5 +9,8 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+base64 = "0.22.1"
 kedi-lang = { path = "../compiler" }
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.4"
 wasm-bindgen = "0.2.92"

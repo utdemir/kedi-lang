@@ -3,9 +3,10 @@ resolver = "2"
 members = [ 
     "cli",
     "compiler",
-    "online",
+    "compiler_web",
     "xtask"
 ]
 
 [workspace.metadata.bin]
 cargo-nextest = { version = "0.9.72" }
+wasm-pack = { version = "0.13.0" }
