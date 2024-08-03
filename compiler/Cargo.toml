@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[build-dependencies]
+lalrpop = "0.20.2"
+
 [dependencies]
 bimap = "0.6.3"
 indices = "0.3.1"
@@ -15,8 +18,8 @@ source-map = "0.15.0"
 ustr = "1.0.0"
 wasmprinter = "0.209.1"
 wast = "209.0.1"
-
-# We're not using this - but we need to enable the 'js' feature
+lalrpop-util = { version = "0.20.2", features = ["lexer", "unicode"] }
+# We're not using this - but we need to enable the 'js' feature for the wasm compilation
 getrandom = { version = "*", features = ["js"] }
 
 [dev-dependencies]

@@ -1,7 +1,7 @@
 fn PositiveNumber(n: Number): Bool {
     return n > 0;
 }
-
+ 
 fn fibonacci(nth: PositiveNumber): PositiveNumber {
     let ret = 1;
     let prev = 0;
@@ -16,3 +16,37 @@ fn fibonacci(nth: PositiveNumber): PositiveNumber {
 
     return ret;
 }
+
+# Alternative
+
+fibonacci := (nth: Number): Number {
+    ret := 1;
+    prev := 0;
+
+    i := 1;
+
+    while i <= nth {
+        temp := ret;
+        ret = ret + prev;
+        prev = temp;
+        i = i + 1;
+    }
+}
+
+# Alternative 2
+
+fn fibonacci nth
+    ! Number(nth)
+    ! @return >= nth
+
+    ret  := 1
+    prev := 0
+    i    := 1
+
+    while i <= nth 
+        temp := ret
+        ret   = ret + prev
+        prev  = temp
+        i     = i + 1
+
+    ret

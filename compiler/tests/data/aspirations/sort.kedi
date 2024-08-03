@@ -1,34 +1,29 @@
-SortedArray := Array(_) && isSorted(_)
-
-fn sort(array: Array): SortedArray {
-    @ return == sort(sort(array));
-    @ return.length == array.length;
-    @ return => sort(x) == x;
-
-    let ret = array
-
-    for (let i = 0; i < ret.length; i++) {
-        for (let j = i + 1; j < ret.length; j++) {
-            if (ret[i] > ret[j]) {
-                let temp = ret[i]
-                ret[i] = ret[j]
-                ret[j] = temp
-
-                @ ret[i] <= ret[j]
+fn sort arr
+    : array? arr
+    : arr.all? number?
+    : sorted? @return
+{
+    for i in range(0, arr.length) {
+        for j in range(i+1, arr.length) {
+            if arr[i] > arr[j] {
+                let temp = arr[i];
+                arr[i] = arr[j];
+                arr[j] = temp;
             }
         }
     }
-
-    return ret
 }
 
+fn sorted? arr
+    : array? arr
+    : arr.all? number?
+    : bool? @return
+{
+    for i in range(0, arr.length - 1) {
+        if arr[i] > arr[i+1] {
+            return false;
+        }
+    }
 
-fn isSorted(array: Array<T>): Boolean [
-    return array[0] <= array[1] && isSorted(array.slice(1))
-]
-
-
-Sorted = fn(Array: Array(Number)): Bool {
-    return array[0] <= array[1] && isSorted(array.slice(1))
+    return true;
 }
-

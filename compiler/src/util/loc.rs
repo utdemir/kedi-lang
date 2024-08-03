@@ -206,3 +206,7 @@ impl TagMap {
         }
     }
 }
+
+// Synonyms
+
+pub type LVec<T> = Located<Vec<T>>;

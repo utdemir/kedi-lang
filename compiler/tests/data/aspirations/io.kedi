@@ -1,0 +1,37 @@
+unsafe namespace kv {
+    struct KV {
+        filepath: string
+    }
+
+    fn get str
+        : string? str
+    {
+        ...
+    }
+
+    fn put str str {
+        ....
+    }
+}
+
+mock namespace kv {
+    struct KV {
+        values: Array(string, string)
+    }
+
+    fn get str
+        : string? str
+    {
+        for i in range(0, this.values.length) {
+            if this.values[i].0 == str {
+                return this.values[i].1;
+            }
+        }
+
+        return null;
+    }
+
+    fn put str str {
+        this.values.push((str, str));
+    }
+}
