@@ -5,7 +5,7 @@ use super::simple;
 
 pub fn run(fun: &mut simple::Module) {
     for stmt in &mut fun.statements {
-        match &mut stmt.value {
+        match stmt {
             simple::TopLevelStmt::FunDecl(fun) => {
                 let fun_impl = &mut fun.value.implementation.value;
                 prune_single_use::run(fun_impl);

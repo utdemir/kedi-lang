@@ -1,0 +1,96 @@
+use std::str::FromStr;
+use super::syntax::*;
+use crate::util::loc::{WithLoc, Span};
+
+grammar;
+
+// Expressions
+
+L<T>: WithLoc<T> = {
+    <start: @L> <val: T> <end: @R> => WithLoc::known(val, Span::from_offset_bytes(start, end))
+};
+
+WithSemi<T>: T = {
+    <stmt:T> Semi => stmt,
+};
+
+pub Ident: Ident = {
+    <s:r"@?[a-zA-Z_][a-zA-Z0-9_]*\??"> => Ident(s.to_string()),
+};
+
+pub LitNum: LitNum = {
+    <s:r"[0-9]+"> => LitNum(i32::from_str(s).unwrap()),
+};
+
+pub LitStr: LitStr = {
+    <s:r#""[^"]*""#> => LitStr(s[1..s.len()-1].to_string()),
+};
+
+pub FunCall: FunCall = {
+    <name:L<Ident>> <args: L< <arg:SimpleExpr+> >> => FunCall { name, args },
+};
+
+Semi: () = {
+    ";" => (),
+};
+
+pub SimpleExpr: Expr = {
+    <n:L<LitNum>> => Expr::LitNum(n),
+    <s:L<LitStr>> => Expr::LitStr(s),
+    <i:L<Ident>> => Expr::Ident(i),
+    "(" <e:Expr> ")" => e,
+};
+
+pub Expr: Expr = {
+    <e:SimpleExpr> => e,
+    <f:FunCall> => Expr::FunCall(f),
+};
+
+// Statements
+
+pub TopLevelStmt: TopLevelStmt = {
+    <f: L<FunDef>> => TopLevelStmt::FunDef(f),
+};
+
+pub FunDef: FunDef = {
+    "fn" 
+        <name:L<Ident>> 
+        <params: L< <p:L<Ident>*> >>
+        <preds: L< <p:Pred*> >>
+        <body: L<Block>> => FunDef { name, params, preds, body },
+};
+
+Pred: Expr = {
+    ":" <pred:Expr> => pred,
+};
+
+Block: Vec<FunStmt> = {
+    "{" <stmts: FunStmt* > "}" => stmts,
+};
+
+pub FunStmt: FunStmt = {
+    <stmt:L<WithSemi<Return>>> => FunStmt::Return(stmt),
+    <stmt:L<WithSemi<Assignment>>> => FunStmt::Assignment(stmt),
+    <stmt:L<WithSemi<LetDecl>>> => FunStmt::LetDecl(stmt),
+    <stmt:L<While>> => FunStmt::While(stmt),
+};
+
+pub Return: Return = {
+    "return" <e:Expr> => Return(e),
+};
+
+pub Assignment: Assignment = {
+    <name:L<Ident>> "=" <value:Expr> => Assignment { name, value },
+};
+
+pub LetDecl : LetDecl = {
+    "let" <name:L<Ident>> "=" <value:Expr> => LetDecl { name, value },
+};
+
+pub While: While = {
+    "while" <condition:Expr> <body:L<Block>> => While { condition, body },
+};
+
+pub Module: Module = {
+    <stmts: L< <arg:TopLevelStmt*> >> => Module { statements: stmts },
+};

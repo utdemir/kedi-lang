@@ -1,6 +1,8 @@
-pub mod parser;
+pub mod grammar;
 pub mod syntax;
 
-extern crate pest;
+mod error;
+pub use error::*;
 
+mod parser;
 pub use parser::*;

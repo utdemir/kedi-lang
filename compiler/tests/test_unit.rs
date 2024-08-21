@@ -3,9 +3,6 @@ mod util;
 
 mk_tests! {
     id: assert_example("id", "id", &[42], 42),
-    inline_wasm_gt_neg: assert_example("inline_wasm", "greater_than", &[2, 3], 0),
-    inline_wasm_gt_eq: assert_example("inline_wasm", "greater_than", &[2, 2], 0),
-    inline_wasm_gt_pos: assert_example("inline_wasm", "greater_than", &[3, 2], 1),
     assignment: assert_example("assignment", "assignment", &[], 2),
 }
 

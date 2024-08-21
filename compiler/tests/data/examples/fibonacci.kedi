@@ -1,52 +1,22 @@
-fn PositiveNumber(n: Number): Bool {
-    return n > 0;
+fn positive? n
+  : number? n
+  : bool? @return {
+    return gt n 0;
 }
  
-fn fibonacci(nth: PositiveNumber): PositiveNumber {
+fn fibonacci nth
+    : positive? nth
+    : positive? @return {
     let ret = 1;
     let prev = 0;
 
     let i = 1;
-    while i <= nth {
+    while lte i nth {
         let temp = ret;
-        ret = ret + prev;
+        ret = add ret prev;
         prev = temp;
-        i = i + 1;
+        i = add i 1;
     }
 
     return ret;
 }
-
-# Alternative
-
-fibonacci := (nth: Number): Number {
-    ret := 1;
-    prev := 0;
-
-    i := 1;
-
-    while i <= nth {
-        temp := ret;
-        ret = ret + prev;
-        prev = temp;
-        i = i + 1;
-    }
-}
-
-# Alternative 2
-
-fn fibonacci nth
-    ! Number(nth)
-    ! @return >= nth
-
-    ret  := 1
-    prev := 0
-    i    := 1
-
-    while i <= nth 
-        temp := ret
-        ret   = ret + prev
-        prev  = temp
-        i     = i + 1
-
-    ret

@@ -1,4 +1,5 @@
-fn assignment 
-    let mut x = 1
-    x = 2
-    return x
+fn assignment {
+    let x = 1;
+    x = 2;
+    return x;
+}

@@ -10,15 +10,15 @@ pub trait SExpr {
 
 #[derive(Debug, Clone)]
 pub enum SExprTerm {
-    Atom(String),
+    Symbol(String),
     String(String),
     Number(i64),
     List(Vec<SExprTerm>),
 }
 
 impl SExprTerm {
-    pub fn atom(x: &str) -> SExprTerm {
-        SExprTerm::Atom(x.to_string())
+    pub fn symbol(x: &str) -> SExprTerm {
+        SExprTerm::Symbol(x.to_string())
     }
 
     pub fn string(x: &str) -> SExprTerm {
@@ -29,15 +29,29 @@ impl SExprTerm {
         SExprTerm::Number(x.into())
     }
 
-    pub fn call(name: &str, args: Vec<SExprTerm>) -> SExprTerm {
-        let mut list = vec![SExprTerm::Atom(name.to_string())];
-        list.extend(args);
+    pub fn call<'t, I, T>(name: &str, args: I) -> SExprTerm
+    where
+        I: IntoIterator<Item = &'t T>,
+        T: SExpr + 't,
+    {
+        let mut list = vec![SExprTerm::Symbol(name.to_string())];
+        for arg in args.into_iter() {
+            list.push(arg.to_sexpr());
+        }
         SExprTerm::List(list)
+    }
+
+    pub fn list<I>(args: I) -> SExprTerm
+    where
+        I: IntoIterator,
+        I::Item: SExpr,
+    {
+        SExprTerm::List(args.into_iter().map(|arg| arg.to_sexpr()).collect())
     }
 
     pub fn to_doc(&self) -> RcDoc<()> {
         match *self {
-            SExprTerm::Atom(ref x) => RcDoc::as_string(x),
+            SExprTerm::Symbol(ref x) => RcDoc::as_string(x),
             SExprTerm::String(ref x) => RcDoc::text(format!("{:?}", x)),
             SExprTerm::Number(ref x) => RcDoc::as_string(x),
             SExprTerm::List(ref xs) => RcDoc::text("(")
@@ -87,8 +101,13 @@ impl SExpr for String {
     }
 }
 
-// Pretty printing
+impl SExpr for &str {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::String(self.to_string())
+    }
+}
 
+// Pretty printing
 pub struct Options {
     pub width: usize,
 }
@@ -112,7 +131,7 @@ where
     fn to_sexpr(&self) -> SExprTerm {
         match *self {
             Some(ref x) => SExprTerm::List(vec![x.to_sexpr()]),
-            None => SExprTerm::Atom("None".to_string()),
+            None => SExprTerm::Symbol("None".to_string()),
         }
     }
 }

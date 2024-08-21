@@ -6,13 +6,13 @@ use crate::{
 
 use super::optimizations;
 
-type Instrs = Vec<Tagged<simple::Statement>>;
+type Instrs = Vec<simple::FunStmt>;
 
 pub fn run(fun: &plain::Module) -> simple::Module {
     let statements = fun
         .statements
         .iter()
-        .map(|stmt| stmt.map(|stmt| simplify_top_level_stmt(&stmt)))
+        .map(|stmt| simplify_top_level_stmt(&stmt))
         .collect();
     let mut initial = simple::Module { statements };
 
@@ -21,15 +21,15 @@ pub fn run(fun: &plain::Module) -> simple::Module {
     return initial;
 }
 
-fn simplify_top_level_stmt(stmt: &plain::TopLevelStatement) -> simple::TopLevelStmt {
+fn simplify_top_level_stmt(stmt: &plain::TopLevelStmt) -> simple::TopLevelStmt {
     match stmt {
-        plain::TopLevelStatement::FunDecl(fun) => simple::TopLevelStmt::FunDecl(fun.map(|fun| {
-            return simplify_fun_decl(&fun);
-        })),
+        plain::TopLevelStmt::FunDef(fun) => {
+            simple::TopLevelStmt::FunDecl(fun.map(simplify_fun_decl))
+        }
     }
 }
 
-fn simplify_fun_decl(fun: &plain::FunDecl) -> simple::FunDecl {
+fn simplify_fun_decl(fun: &plain::FunDef) -> simple::FunDecl {
     let impl_loc = fun.implementation.location;
 
     let (simpl, tag_map) = simply_fun_impl(&fun.implementation.value);
@@ -51,12 +51,8 @@ pub fn simply_fun_impl(fun: &plain::FunImpl) -> (simple::FunImpl, loc::TagMap) {
     return (
         simple::FunImpl {
             parameters: fun
-                .parameters
-                .map(|ps| {
-                    ps.iter()
-                        .map(|x| x.map(|x| x.name).to_tagged(&mut state.tag_map))
-                        .collect()
-                })
+                .params
+                .map(|ps| ps.iter().map(|x| x.to_tagged(&mut state.tag_map)).collect())
                 .to_tagged(&mut state.tag_map),
             body: fun
                 .body
@@ -71,29 +67,25 @@ pub fn simply_fun_impl(fun: &plain::FunImpl) -> (simple::FunImpl, loc::TagMap) {
 fn simplify_block(
     state: &mut SimplifyFunImplState,
     instrs: &mut Instrs,
-    stmt: &Vec<Located<plain::FunStatement>>,
+    stmt: &Vec<plain::FunStmt>,
 ) {
     for stmt in stmt.iter() {
-        match &stmt.value {
-            plain::FunStatement::Return(expr) => {
-                let body = state.compile_expr(instrs, &expr.value);
-                instrs.push(body.map(|i| simple::Statement::Return(*i)));
+        match &stmt {
+            plain::FunStmt::Return(expr) => {
+                let body = state.compile_expr(instrs, &expr.value.0);
+                instrs.push(simple::FunStmt::Return(body));
             }
-            plain::FunStatement::LetDecl(l_decl) => {
+            plain::FunStmt::LetDecl(l_decl) => {
                 let tag = l_decl.location.to_tag(&mut state.tag_map);
-                let body = state.compile_expr(instrs, &l_decl.value.value.value);
-                instrs.push(
-                    tag.attach(simple::Statement::Assignment(simple::Assignment {
-                        target: l_decl
-                            .value
-                            .name
-                            .map(|id| simple::Identifier::Plain(id.widen()))
-                            .to_tagged(&mut state.tag_map),
-                        value: body.map(|b| simple::AssignmentValue::Identifier(*b)),
-                    })),
-                );
+                let body = state.compile_expr(instrs, &l_decl.value.value);
+                instrs.push(simple::FunStmt::Assignment(tag.attach(
+                    simple::Assignment {
+                        target: state.widen_plain_ident(&l_decl.value.name.widen().value),
+                        value: simple::AssignmentValue::Ident(body),
+                    },
+                )));
             }
-            plain::FunStatement::While(l_while) => {
+            plain::FunStmt::While(l_while) => {
                 let tag = l_while.location.to_tag(&mut state.tag_map);
                 let while_ = &l_while.value;
 
@@ -101,13 +93,13 @@ fn simplify_block(
                 let mut loop_instrs = vec![];
 
                 // Add the break condition
-                let condition = state.compile_expr(&mut loop_instrs, &while_.condition.value);
-                loop_instrs.push(condition.tag.attach(simple::Statement::If(simple::If {
+                let condition = state.compile_expr(&mut loop_instrs, &while_.condition);
+                loop_instrs.push(simple::FunStmt::If(condition.tag().attach(simple::If {
                     condition,
-                    then: condition.tag.attach(vec![]),
-                    else_: condition.tag.attach(vec![
-                        condition.tag.attach(simple::Statement::Break(label.clone())),
-                    ]),
+                    then: condition.tag().attach(vec![]),
+                    else_: condition.tag().attach(vec![condition.tag().attach(
+                        simple::FunStmt::Break(condition.tag().attach(label.clone())),
+                    )]),
                 })));
 
                 // Add the rest of the body
@@ -119,44 +111,19 @@ fn simplify_block(
                     body: tag.attach(loop_instrs),
                 };
 
-                instrs.push(tag.attach(simple::Statement::Loop(loop_)));
+                instrs.push(simple::FunStmt::Loop(tag.attach(loop_)));
             }
-            plain::FunStatement::Assignment(l_assign) => {
+            plain::FunStmt::Assignment(l_assign) => {
                 let tag = l_assign.location.to_tag(&mut state.tag_map);
                 let assign = &l_assign.value;
 
-                let body = state.compile_expr(instrs, &assign.value.value);
-                instrs.push(
-                    tag.attach(simple::Statement::Assignment(simple::Assignment {
-                        target: assign
-                            .id
-                            .map(|id| simple::Identifier::Plain(id.widen()))
-                            .to_tagged(&mut state.tag_map),
-                        value: body.map(|b| simple::AssignmentValue::Identifier(*b)),
-                    })),
-                );
-            }
-            plain::FunStatement::InlineWasm(l_inline_wasm) => {
-                let tag = l_inline_wasm.location.to_tag(&mut state.tag_map);
-                let inline_wasm = &l_inline_wasm.value;
-
-                let input_stack =
-                    map_located_vec(&mut state.tag_map, &inline_wasm.input_stack, |x| {
-                        simple::Identifier::Plain(x.widen())
-                    });
-
-                let output_stack =
-                    map_located_vec(&mut state.tag_map, &inline_wasm.output_stack, |x| {
-                        simple::Identifier::Plain(x.widen())
-                    });
-
-                instrs.push(
-                    tag.attach(simple::Statement::InlineWasm(simple::InlineWasm {
-                        input_stack,
-                        output_stack,
-                        wasm: inline_wasm.wasm.clone().to_tagged(&mut state.tag_map),
-                    })),
-                )
+                let body = state.compile_expr(instrs, &assign.value);
+                instrs.push(simple::FunStmt::Assignment(tag.attach(
+                    simple::Assignment {
+                        target: state.widen_plain_ident(&assign.id.widen().value),
+                        value: simple::AssignmentValue::Ident(body),
+                    },
+                )));
             }
             _ => todo!(),
         }
@@ -178,61 +145,53 @@ impl SimplifyFunImplState {
         }
     }
 
-    fn get_single_use_identifier(&mut self) -> simple::SingleUseIdentifier {
-        let id = simple::SingleUseIdentifier {
+    fn get_single_use_identifier(&mut self) -> simple::SingleUseIdent {
+        let id = simple::SingleUseIdent {
             id: self.next_single_use_identifier,
         };
         self.next_single_use_identifier += 1;
         return id;
     }
 
-    fn compile_expr(
-        &mut self,
-        instrs: &mut Instrs,
-        expr: &plain::Expr,
-    ) -> Tagged<simple::Identifier> {
+    fn compile_expr(&mut self, instrs: &mut Instrs, expr: &plain::Expr) -> simple::Ident {
         match expr {
-            plain::Expr::LitNumber(n) => {
-                let id = self.get_single_use_identifier();
-                let sid = simple::Identifier::SingleUse(id);
-
+            plain::Expr::LitNum(n) => {
                 let tag = self.tag_map.get_tag(n.location);
 
+                let id = self.get_single_use_identifier();
+                let sid = simple::Ident::SingleUse(tag.attach(id));
+
                 let instr = simple::Assignment {
-                    target: tag.attach(sid),
-                    value: tag.attach(simple::AssignmentValue::LiteralNumber(n.value)),
+                    target: sid,
+                    value: simple::AssignmentValue::LitNum(tag.attach(n.value)),
                 };
 
-                instrs.push(tag.attach(simple::Statement::Assignment(instr)));
+                instrs.push(simple::FunStmt::Assignment(tag.attach(instr)));
 
-                return tag.attach(sid);
+                return sid;
             }
-            plain::Expr::ValueIdentifier(id) => {
-                return id
-                    .map(|id| simple::Identifier::Plain(*id))
-                    .to_tagged(&mut self.tag_map);
-            }
+            plain::Expr::Ident(id) => return self.widen_plain_ident(id),
             plain::Expr::FunCall(fun) => {
-                let tag = fun.location.to_tag(&mut self.tag_map);
+                let tag = fun.location().to_tag(&mut self.tag_map);
 
                 let mut ps = vec![];
-                for arg in fun.value.arguments.value.iter() {
-                    ps.push(self.compile_expr(instrs, &arg.value));
+                for arg in fun.args.value.iter() {
+                    ps.push(self.compile_expr(instrs, &arg));
                 }
 
                 let target = self.get_single_use_identifier();
-                let starget = simple::Identifier::SingleUse(target);
+                let starget = simple::Ident::SingleUse(tag.attach(target));
 
-                instrs.push(
-                    tag.attach(simple::Statement::Assignment(simple::Assignment {
-                        target: tag.attach(starget),
-                        value: tag.attach(simple::AssignmentValue::Call(simple::Call {
-                            fun_name: fun.value.name.to_tagged(&mut self.tag_map),
+                instrs.push(simple::FunStmt::Assignment(tag.attach(
+                    simple::Assignment {
+                        target: starget,
+                        value: simple::AssignmentValue::Call(tag.attach(simple::Call {
+                            fun_name: fun.name.to_tagged(&mut self.tag_map),
                             arguments: tag.attach(ps),
                         })),
-                    })),
-                );
-                return tag.attach(starget);
+                    },
+                )));
+                return starget;
             }
             _ => todo!(),
         }
@@ -243,23 +202,11 @@ impl SimplifyFunImplState {
         self.next_loop_label += 1;
         return simple::Label { id };
     }
-}
 
-// Utils
-
-fn map_located_vec<T, K, F>(
-    tag_map: &mut loc::TagMap,
-    input: &Located<Vec<Located<T>>>,
-    f: F,
-) -> Tagged<Vec<Tagged<K>>>
-where
-    F: Fn(&T) -> K,
-{
-    input
-        .map(|xs| {
-            xs.iter()
-                .map(|x| x.map(|x| f(x)).to_tagged(tag_map))
-                .collect()
-        })
-        .to_tagged(tag_map)
+    fn widen_plain_ident(&mut self, id: &plain::Ident) -> simple::Ident {
+        match id {
+            plain::Ident::Local(id) => simple::Ident::Local(id.to_tagged(&mut self.tag_map)),
+            plain::Ident::Global(id) => todo!("not supported yet"), // simple::Ident::Global(id.to_tagged(&mut self.tag_map)),
+        }
+    }
 }

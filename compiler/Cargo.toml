@@ -11,8 +11,6 @@ lalrpop = "0.20.2"
 bimap = "0.6.3"
 indices = "0.3.1"
 miette = "7.2.0"
-pest = "2.7.5"
-pest_derive = "2.7.5"
 pretty = "0.12.3"
 source-map = "0.15.0"
 ustr = "1.0.0"
@@ -21,6 +19,9 @@ wast = "209.0.1"
 lalrpop-util = { version = "0.20.2", features = ["lexer", "unicode"] }
 # We're not using this - but we need to enable the 'js' feature for the wasm compilation
 getrandom = { version = "*", features = ["js"] }
+simple-interner = "0.3.4"
+lasso = "0.7.2"
+wasm-encoder = "0.215.0"
 
 [dev-dependencies]
 test-case = "3.3.1"

@@ -1,8 +1,14 @@
-fn id(a: Number): Number {
-    return a;
+fn id a
+  : number? a 
+  : number? @return 
+{
+  return a;
 }
 
-fn also_id(b: Number): Number {
-    let unused = 12;
-    return id(b);
+fn also_id b
+  : number? b
+  : number? @return 
+{
+  let unused = 12;
+  return id b;
 }

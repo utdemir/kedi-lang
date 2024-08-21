@@ -1,0 +1,27 @@
+fn number? n {
+    return __prim__number? n;
+}
+
+fn bool? n {
+    return __prim__bool? n;
+}
+
+fn gt? n { 
+    return __prim_gt? n;
+}
+
+fn lt? n {
+    return __prim_lt? n;
+}
+
+fn gte? n {
+    return __prim_gte? n;
+}
+
+fn lte? n {
+    return __prim_lte? n;
+}
+
+fn eq? n {
+    return __prim_eq? n;
+}

@@ -11,10 +11,12 @@ pub fn annotate_error<T: Into<core::Error>>(error: T, src: String) -> miette::Re
             parser::Error::ParseFailed(err) => miette::MietteDiagnostic {
                 severity: Some(miette::Severity::Error),
                 code: None,
-                message: err.text,
+                message: err.msg.clone(),
                 help: None,
                 url: None,
-                labels: None,
+                labels: Some(vec![miette::LabeledSpan::new_primary_with_span(
+                    None, err.span,
+                )]),
             },
         },
         core::Error::Renamer(e) => match e {
@@ -54,7 +56,7 @@ pub fn annotate_error<T: Into<core::Error>>(error: T, src: String) -> miette::Re
 
 impl Into<miette::SourceSpan> for loc::Span {
     fn into(self) -> miette::SourceSpan {
-        miette::SourceSpan::new(self.start.offset.into(), self.length)
+        miette::SourceSpan::new(self.start.0.into(), self.length)
     }
 }
 

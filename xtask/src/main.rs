@@ -33,7 +33,7 @@ fn main() {
 
             cargo_run_bin::binary::run(bin_path, cmd).unwrap();
         }
-        "build-website" => {
+        "build-compiler-web-artifacts" => {
             let binary_package = binaries.get("wasm-pack").unwrap().to_owned();
             let bin_path = cargo_run_bin::binary::install(binary_package).unwrap();
 

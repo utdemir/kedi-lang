@@ -1,72 +1,79 @@
 use std::collections::HashMap;
 
 use crate::parser::syntax;
-use crate::util::loc::Located;
+use crate::util::loc::{LVec, Located, SrcLoc, WithLoc};
 use crate::util::pp::{SExpr, SExprTerm};
 
 #[derive(Debug, Copy, Eq, PartialEq, Hash, Clone)]
-pub enum Identifier {
-    Local(LocalIdentifier),
-    Global(GlobalIdentifier),
+pub enum Ident {
+    Local(LLocalIdent),
+    Global(LGlobalIdent),
 }
 
-#[derive(Debug, Copy, Eq, PartialEq, Hash, Clone)]
-pub struct LocalIdentifier {
-    pub id: u32,
-}
-
-impl LocalIdentifier {
-    pub fn widen(self) -> Identifier {
-        Identifier::Local(self)
-    }
-}
-
-impl SExpr for LocalIdentifier {
-    fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::Atom(format!("$${}", self.id))
+impl Located for Ident {
+    fn location(&self) -> SrcLoc {
+        match self {
+            Ident::Local(x) => x.location(),
+            Ident::Global(x) => x.location(),
+        }
     }
 }
 
 #[derive(Debug, Copy, Eq, PartialEq, Hash, Clone)]
-pub struct GlobalIdentifier {
+pub struct LocalIdent {
     pub id: u32,
 }
 
-impl GlobalIdentifier {
-    pub fn widen(self) -> Identifier {
-        Identifier::Global(self)
+impl WithLoc<LocalIdent> {
+    pub fn widen(self) -> WithLoc<Ident> {
+        self.map(|i| Ident::Local(self.location.attach(*i)))
     }
 }
 
-impl SExpr for GlobalIdentifier {
+pub type LLocalIdent = WithLoc<LocalIdent>;
+
+impl SExpr for LocalIdent {
     fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::Atom(format!("$$${}", self.id))
+        SExprTerm::Symbol(format!("$${}", self.id))
     }
 }
 
-impl SExpr for Identifier {
+#[derive(Debug, Copy, Eq, PartialEq, Hash, Clone)]
+pub struct GlobalIdent {
+    pub id: u32,
+}
+
+type LGlobalIdent = WithLoc<GlobalIdent>;
+
+impl SExpr for GlobalIdent {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::Symbol(format!("$$${}", self.id))
+    }
+}
+
+impl SExpr for Ident {
     fn to_sexpr(&self) -> SExprTerm {
         match self {
-            Identifier::Local(x) => x.to_sexpr(),
-            Identifier::Global(x) => x.to_sexpr(),
+            Ident::Local(x) => x.to_sexpr(),
+            Ident::Global(x) => x.to_sexpr(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct FunDecl {
-    pub name: Located<syntax::Identifier>,
-    pub implementation: Located<FunImpl>,
-    pub refs: HashMap<GlobalIdentifier, syntax::Identifier>,
+pub struct FunDef {
+    pub name: syntax::LIdent,
+    pub implementation: LFunImpl,
+    pub refs: HashMap<GlobalIdent, syntax::Ident>,
 }
 
-impl SExpr for FunDecl {
+impl SExpr for FunDef {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::List(vec![
-            SExprTerm::Atom("fun".to_string()),
+            SExprTerm::Symbol("fun".to_string()),
             self.name.to_sexpr(),
             SExprTerm::List(
-                vec![SExprTerm::Atom("refs".to_string())]
+                vec![SExprTerm::Symbol("refs".to_string())]
                     .into_iter()
                     .chain(
                         self.refs
@@ -84,83 +91,95 @@ impl SExpr for FunDecl {
 
 #[derive(Debug, Clone)]
 pub struct FunImpl {
-    pub parameters: Located<Vec<Located<FunParam>>>,
-    pub return_predicate: Option<Located<Expr>>,
-    pub body: Located<Vec<Located<FunStatement>>>,
+    pub params: LVec<LLocalIdent>,
+    pub preds: LVec<Expr>,
+    pub body: LVec<FunStmt>,
 }
+
+pub type LFunImpl = WithLoc<FunImpl>;
 
 impl SExpr for FunImpl {
     fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::List(vec![
-            SExprTerm::List(self.parameters.value.iter().map(|x| x.to_sexpr()).collect()),
-            self.return_predicate.to_sexpr(),
-            SExprTerm::List(self.body.value.iter().map(|x| x.to_sexpr()).collect()),
-        ])
+        SExprTerm::call(
+            "fun_impl",
+            &[
+                SExprTerm::call("params", &self.params.value),
+                SExprTerm::call("preds", &self.preds.value),
+                SExprTerm::call("body", &self.body.value),
+            ],
+        )
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct FunParam {
-    pub name: LocalIdentifier,
-    pub predicate: Option<Expr>,
-}
+pub type LitNum = syntax::LitNum;
+pub type LLitNum = syntax::LLitNum;
 
-impl SExpr for FunParam {
-    fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::List(vec![
-            SExprTerm::Atom("param".to_owned()),
-            self.name.to_sexpr(),
-            self.predicate.to_sexpr(),
-        ])
-    }
-}
+pub type LitStr = syntax::LitStr;
+pub type LLitStr = syntax::LLitStr;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-    LitNumber(Located<i32>),
-    LitString(Located<String>),
-    ValueIdentifier(Located<Identifier>),
-    FunCall(Located<FunCall>),
+    LitNum(LLitNum),
+    LitStr(LLitStr),
+    Ident(Ident),
+    FunCall(FunCall),
 }
 
 impl SExpr for Expr {
     fn to_sexpr(&self) -> SExprTerm {
         match self {
-            Expr::LitNumber(x) => SExprTerm::Atom(x.value.to_string()),
-            Expr::LitString(x) => SExprTerm::Atom(x.value.clone()),
-            Expr::ValueIdentifier(x) => x.to_sexpr(),
+            Expr::LitNum(x) => x.to_sexpr(),
+            Expr::LitStr(x) => x.to_sexpr(),
+            Expr::Ident(x) => x.to_sexpr(),
             Expr::FunCall(x) => x.to_sexpr(),
+        }
+    }
+}
+
+impl Located for Expr {
+    fn location(&self) -> SrcLoc {
+        match self {
+            Expr::LitNum(x) => x.location(),
+            Expr::LitStr(x) => x.location(),
+            Expr::Ident(x) => x.location(),
+            Expr::FunCall(x) => x.location(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct FunCall {
-    pub name: Located<GlobalIdentifier>,
-    pub arguments: Located<Vec<Located<Expr>>>,
+    pub name: LGlobalIdent,
+    pub args: LVec<Expr>,
 }
 
 impl SExpr for FunCall {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::List(vec![
-            SExprTerm::Atom("fun_call".to_string()),
+            SExprTerm::Symbol("fun_call".to_string()),
             self.name.to_sexpr(),
-            SExprTerm::List(self.arguments.value.iter().map(|x| x.to_sexpr()).collect()),
+            SExprTerm::List(self.args.value.iter().map(|x| x.to_sexpr()).collect()),
         ])
+    }
+}
+
+impl Located for FunCall {
+    fn location(&self) -> SrcLoc {
+        SrcLoc::all_enclosing(&[self.name.location(), self.args.location()])
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct InlineWasm {
-    pub input_stack: Located<Vec<Located<LocalIdentifier>>>,
-    pub output_stack: Located<Vec<Located<LocalIdentifier>>>,
-    pub wasm: Located<wast::core::Instruction<'static>>,
+    pub input_stack: LVec<WithLoc<LocalIdent>>,
+    pub output_stack: LVec<WithLoc<LocalIdent>>,
+    pub wasm: WithLoc<wast::core::Instruction<'static>>,
 }
 
 impl SExpr for InlineWasm {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::List(vec![
-            SExprTerm::Atom("inline_wasm".to_string()),
+            SExprTerm::Symbol("inline_wasm".to_string()),
             SExprTerm::List(
                 self.input_stack
                     .value
@@ -175,48 +194,61 @@ impl SExpr for InlineWasm {
                     .map(|x| x.to_sexpr())
                     .collect(),
             ),
-            SExprTerm::atom(format!("{:?}", self.wasm.value).as_str()),
+            SExprTerm::symbol(format!("{:?}", self.wasm.value).as_str()),
         ])
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum FunStatement {
-    Return(Located<Expr>),
-    Inv(Located<Expr>),
-    LetDecl(Located<LetDecl>),
-    While(Located<While>),
-    Assignment(Located<Assignment>),
-    InlineWasm(Located<InlineWasm>),
+pub struct Return(pub Expr);
+pub type LReturn = WithLoc<Return>;
+
+impl SExpr for Return {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::call("return", [&self.0.to_sexpr()])
+    }
 }
 
-impl SExpr for FunStatement {
+#[derive(Debug, Clone)]
+pub enum FunStmt {
+    Return(LReturn),
+    Inv(Expr),
+    LetDecl(LLetDecl),
+    While(LWhile),
+    Assignment(LAssignment),
+    // InlineWasm(Located<InlineWasm>),
+}
+
+impl SExpr for FunStmt {
     fn to_sexpr(&self) -> SExprTerm {
         match self {
-            FunStatement::Return(expr) => {
-                SExprTerm::List(vec![SExprTerm::Atom("return".to_string()), expr.to_sexpr()])
+            FunStmt::Return(expr) => SExprTerm::List(vec![
+                SExprTerm::Symbol("return".to_string()),
+                expr.to_sexpr(),
+            ]),
+            FunStmt::Inv(expr) => {
+                SExprTerm::List(vec![SExprTerm::Symbol("inv".to_string()), expr.to_sexpr()])
             }
-            FunStatement::Inv(expr) => {
-                SExprTerm::List(vec![SExprTerm::Atom("inv".to_string()), expr.to_sexpr()])
-            }
-            FunStatement::LetDecl(decl) => decl.to_sexpr(),
-            FunStatement::While(while_) => while_.to_sexpr(),
-            FunStatement::Assignment(assignment) => assignment.to_sexpr(),
-            FunStatement::InlineWasm(inline_wasm) => inline_wasm.to_sexpr(),
+            FunStmt::LetDecl(decl) => decl.to_sexpr(),
+            FunStmt::While(while_) => while_.to_sexpr(),
+            FunStmt::Assignment(assignment) => assignment.to_sexpr(),
+            // FunStmt::InlineWasm(inline_wasm) => inline_wasm.to_sexpr(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct LetDecl {
-    pub name: Located<LocalIdentifier>,
-    pub value: Located<Expr>,
+    pub name: LLocalIdent,
+    pub value: Expr,
 }
+
+pub type LLetDecl = WithLoc<LetDecl>;
 
 impl SExpr for LetDecl {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::List(vec![
-            SExprTerm::Atom("let".to_string()),
+            SExprTerm::Symbol("let".to_string()),
             self.name.to_sexpr(),
             self.value.to_sexpr(),
         ])
@@ -225,14 +257,16 @@ impl SExpr for LetDecl {
 
 #[derive(Debug, Clone)]
 pub struct While {
-    pub condition: Located<Expr>,
-    pub body: Located<Vec<Located<FunStatement>>>,
+    pub condition: Expr,
+    pub body: LVec<FunStmt>,
 }
+
+pub type LWhile = WithLoc<While>;
 
 impl SExpr for While {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::List(vec![
-            SExprTerm::Atom("while".to_string()),
+            SExprTerm::Symbol("while".to_string()),
             self.condition.to_sexpr(),
             SExprTerm::List(self.body.value.iter().map(|x| x.to_sexpr()).collect()),
         ])
@@ -241,14 +275,16 @@ impl SExpr for While {
 
 #[derive(Debug, Clone)]
 pub struct Assignment {
-    pub id: Located<LocalIdentifier>,
-    pub value: Located<Expr>,
+    pub id: LLocalIdent,
+    pub value: Expr,
 }
+
+pub type LAssignment = WithLoc<Assignment>;
 
 impl SExpr for Assignment {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::List(vec![
-            SExprTerm::Atom("assignment".to_string()),
+            SExprTerm::Symbol("assignment".to_string()),
             self.id.to_sexpr(),
             self.value.to_sexpr(),
         ])
@@ -256,21 +292,21 @@ impl SExpr for Assignment {
 }
 
 #[derive(Debug, Clone)]
-pub enum TopLevelStatement {
-    FunDecl(Located<FunDecl>),
+pub enum TopLevelStmt {
+    FunDef(WithLoc<FunDef>),
 }
 
-impl SExpr for TopLevelStatement {
+impl SExpr for TopLevelStmt {
     fn to_sexpr(&self) -> SExprTerm {
         match self {
-            TopLevelStatement::FunDecl(fun_decl) => fun_decl.to_sexpr(),
+            TopLevelStmt::FunDef(fun_decl) => fun_decl.to_sexpr(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Module {
-    pub statements: Vec<Located<TopLevelStatement>>,
+    pub statements: Vec<TopLevelStmt>,
 }
 
 impl SExpr for Module {

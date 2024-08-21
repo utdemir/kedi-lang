@@ -2,26 +2,26 @@ use std::collections::HashMap;
 
 use crate::parser::syntax;
 use crate::renamer::plain;
-use crate::util::loc::Located;
+use crate::util::loc::WithLoc;
 use crate::util::pp;
 
 #[derive(Debug)]
-pub struct Module<'t> {
-    pub statements: Vec<Located<TopLevelStmt<'t>>>,
+pub struct Module {
+    pub statements: Vec<TopLevelStmt>,
 }
 
-impl pp::SExpr for Module<'_> {
+impl pp::SExpr for Module {
     fn to_sexpr(&self) -> pp::SExprTerm {
         pp::SExprTerm::List(self.statements.iter().map(|stmt| stmt.to_sexpr()).collect())
     }
 }
 
-#[derive(Debug)]
-pub enum TopLevelStmt<'t> {
-    FunDecl(FunDecl<'t>),
+#[derive(Debug, Clone)]
+pub enum TopLevelStmt {
+    FunDecl(WithLoc<FunDecl>),
 }
 
-impl pp::SExpr for TopLevelStmt<'_> {
+impl pp::SExpr for TopLevelStmt {
     fn to_sexpr(&self) -> pp::SExprTerm {
         match self {
             TopLevelStmt::FunDecl(fun) => fun.to_sexpr(),
@@ -29,37 +29,77 @@ impl pp::SExpr for TopLevelStmt<'_> {
     }
 }
 
-#[derive(Debug)]
-pub struct FunDecl<'t> {
-    pub name: Located<syntax::Identifier>,
-    pub implementation: Located<FunImpl<'t>>,
-    pub refs: HashMap<plain::GlobalIdentifier, syntax::Identifier>,
+#[derive(Debug, Clone)]
+pub struct FunDecl {
+    pub name: WithLoc<syntax::Ident>,
+    pub implementation: WithLoc<FunImpl>,
+    pub refs: HashMap<plain::GlobalIdent, syntax::Ident>,
 }
 
-impl pp::SExpr for FunDecl<'_> {
+impl pp::SExpr for FunDecl {
     fn to_sexpr(&self) -> pp::SExprTerm {
         pp::SExprTerm::List(vec![
-            pp::SExprTerm::Atom("fun".to_string()),
+            pp::SExprTerm::Symbol("fun".to_string()),
             self.name.to_sexpr(),
             self.implementation.to_sexpr(),
         ])
     }
 }
 
-#[derive(Debug)]
-pub struct FunImpl<'t> {
-    pub parameters: Vec<plain::LocalIdentifier>,
-    pub body: wast::core::Func<'t>,
+#[derive(Debug, Clone)]
+pub struct FunImpl {
+    pub params: Vec<wasm_encoder::ValType>,
+    pub body: Vec<Instr>,
 }
 
-impl pp::SExpr for FunImpl<'_> {
+impl pp::SExpr for FunImpl {
     fn to_sexpr(&self) -> pp::SExprTerm {
         pp::SExprTerm::List(vec![
-            pp::SExprTerm::List(self.parameters.iter().map(|x| x.to_sexpr()).collect()),
             pp::SExprTerm::call(
-                "wasm",
-                vec![pp::SExprTerm::atom(&format!("{:#?}", self.body))],
+                "params",
+                &self
+                    .params
+                    .iter()
+                    .map(|x| pp::SExprTerm::symbol(&format!("{:?}", x)))
+                    .collect::<Vec<_>>(),
+            ),
+            pp::SExprTerm::call(
+                "body",
+                &[pp::SExprTerm::symbol(&format!("{:#?}", self.body))],
             ),
         ])
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Instr {
+    Call(Call),
+    Raw(wasm_encoder::Instruction<'static>),
+}
+
+impl pp::SExpr for Instr {
+    fn to_sexpr(&self) -> pp::SExprTerm {
+        match self {
+            Instr::Call(call) => call.to_sexpr(),
+            Instr::Raw(instr) => pp::SExprTerm::symbol(&format!("{:?}", instr)),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Call {
+    pub fun: plain::GlobalIdent,
+    pub arity: usize,
+}
+
+impl pp::SExpr for Call {
+    fn to_sexpr(&self) -> pp::SExprTerm {
+        pp::SExprTerm::call(
+            "call",
+            &[
+                pp::SExprTerm::number(self.fun.id),
+                pp::SExprTerm::Symbol(format!("[{}]", self.arity)),
+            ],
+        )
     }
 }

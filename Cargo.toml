@@ -4,7 +4,7 @@ members = [
     "cli",
     "compiler",
     "compiler_web",
-    "xtask"
+    "xtask", 
 ]
 
 [workspace.metadata.bin]

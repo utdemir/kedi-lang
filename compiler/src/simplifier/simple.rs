@@ -1,4 +1,4 @@
-use crate::util::loc::{Located, Tagged};
+use crate::util::loc::{Located, Tagged, WithLoc, WithTag};
 use std::collections::HashMap;
 
 use crate::{
@@ -9,48 +9,57 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct SingleUseIdentifier {
+pub struct SingleUseIdent {
     pub id: u32,
 }
 
-impl SExpr for SingleUseIdentifier {
+impl SExpr for SingleUseIdent {
     fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::Atom(format!("${}", self.id))
+        SExprTerm::Symbol(format!("${}", self.id))
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Identifier {
-    Plain(plain::Identifier),
-    SingleUse(SingleUseIdentifier),
+pub enum Ident {
+    Local(WithTag<plain::LocalIdent>),
+    // Global(WithTag<plain::GlobalIdent>),
+    SingleUse(WithTag<SingleUseIdent>),
 }
 
-impl SExpr for Identifier {
+impl SExpr for Ident {
     fn to_sexpr(&self) -> SExprTerm {
         match self {
-            Identifier::Plain(p) => p.to_sexpr(),
-            Identifier::SingleUse(u) => u.to_sexpr(),
+            Ident::Local(l) => l.to_sexpr(),
+            // Ident::Global(g) => g.to_sexpr(),
+            Ident::SingleUse(u) => u.to_sexpr(),
+        }
+    }
+}
+
+impl Tagged for Ident {
+    fn tag(&self) -> loc::Tag {
+        match self {
+            Ident::Local(l) => l.tag(),
+            // Ident::Global(g) => g.tag(),
+            Ident::SingleUse(u) => u.tag(),
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Module {
-    pub statements: Vec<Located<TopLevelStmt>>,
+    pub statements: Vec<TopLevelStmt>,
 }
 
 impl SExpr for Module {
     fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::call(
-            "module",
-            self.statements.iter().map(|x| x.to_sexpr()).collect(),
-        )
+        SExprTerm::call("module", &self.statements)
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum TopLevelStmt {
-    FunDecl(Located<FunDecl>),
+    FunDecl(WithLoc<FunDecl>),
 }
 
 impl SExpr for TopLevelStmt {
@@ -61,28 +70,37 @@ impl SExpr for TopLevelStmt {
     }
 }
 
+impl Located for TopLevelStmt {
+    fn location(&self) -> loc::SrcLoc {
+        match self {
+            TopLevelStmt::FunDecl(f) => f.location(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct FunDecl {
-    pub name: Located<syntax::Identifier>,
-    pub implementation: Located<FunImpl>,
+    pub name: syntax::LIdent,
+    pub implementation: WithLoc<FunImpl>,
     pub tag_map: loc::TagMap,
-    pub refs: HashMap<plain::GlobalIdentifier, syntax::Identifier>,
+    pub refs: HashMap<plain::GlobalIdent, syntax::Ident>,
 }
 
 impl SExpr for FunDecl {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::call(
             "fun_decl",
-            vec![
-                self.name.to_sexpr(),
-                SExprTerm::call(
+            [
+                &self.name.to_sexpr(),
+                &SExprTerm::call(
                     "refs",
-                    self.refs
+                    &self
+                        .refs
                         .iter()
-                        .map(|(k, v)| SExprTerm::call("ref", vec![k.to_sexpr(), v.to_sexpr()]))
-                        .collect(),
+                        .map(|(k, v)| SExprTerm::call("ref", [&k.to_sexpr(), &v.to_sexpr()]))
+                        .collect::<Vec<_>>(),
                 ),
-                SExprTerm::call("implementation", vec![self.implementation.to_sexpr()]),
+                &SExprTerm::call("implementation", [&self.implementation.to_sexpr()]),
             ],
         )
     }
@@ -90,68 +108,75 @@ impl SExpr for FunDecl {
 
 #[derive(Clone, Debug)]
 pub struct FunImpl {
-    pub parameters: Tagged<Vec<Tagged<plain::LocalIdentifier>>>,
-    pub body: Tagged<Vec<Tagged<Statement>>>,
+    pub parameters: WithTag<Vec<WithTag<plain::LocalIdent>>>,
+    pub body: WithTag<Vec<FunStmt>>,
 }
 
 impl SExpr for FunImpl {
     fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::List(vec![
-            SExprTerm::atom("fun_impl"),
-            SExprTerm::call(
-                "parameters",
-                self.parameters.value.iter().map(|x| x.to_sexpr()).collect(),
-            ),
-            SExprTerm::List(self.body.value.iter().map(|x| x.to_sexpr()).collect()),
-        ])
+        SExprTerm::call(
+            "fun_impl",
+            [
+                &SExprTerm::call("parameters", &self.parameters.value),
+                &SExprTerm::List(self.body.value.iter().map(|x| x.to_sexpr()).collect()),
+            ],
+        )
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Assignment {
-    pub target: Tagged<Identifier>,
-    pub value: Tagged<AssignmentValue>,
+    pub target: Ident,
+    pub value: AssignmentValue,
 }
 
 impl SExpr for Assignment {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::call(
             "assignment",
-            vec![self.target.to_sexpr(), self.value.to_sexpr()],
+            &[self.target.to_sexpr(), self.value.to_sexpr()],
         )
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Call {
-    pub fun_name: Tagged<plain::GlobalIdentifier>,
-    pub arguments: Tagged<Vec<Tagged<Identifier>>>,
+    pub fun_name: WithTag<plain::GlobalIdent>,
+    pub arguments: WithTag<Vec<Ident>>,
 }
 
 impl SExpr for Call {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::call(
             "call",
-            vec![self.fun_name.to_sexpr(), self.arguments.to_sexpr()],
+            &[self.fun_name.to_sexpr(), self.arguments.to_sexpr()],
         )
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum AssignmentValue {
-    Call(Call),
-    Identifier(Identifier),
-    LiteralNumber(i32),
+    Call(WithTag<Call>),
+    Ident(Ident),
+    LitNum(WithTag<plain::LitNum>),
 }
 
 impl SExpr for AssignmentValue {
     fn to_sexpr(&self) -> SExprTerm {
         match self {
             AssignmentValue::Call(c) => c.to_sexpr(),
-            AssignmentValue::Identifier(v) => v.to_sexpr(),
-            AssignmentValue::LiteralNumber(n) => {
-                SExprTerm::call("lit_number", vec![SExprTerm::number(*n)])
-            }
+            AssignmentValue::Ident(v) => v.to_sexpr(),
+            AssignmentValue::LitNum(n) => n.to_sexpr(),
+        }
+    }
+}
+
+impl Tagged for AssignmentValue {
+    fn tag(&self) -> loc::Tag {
+        match self {
+            AssignmentValue::Call(c) => c.tag(),
+            AssignmentValue::Ident(i) => i.tag(),
+            AssignmentValue::LitNum(n) => n.tag(),
         }
     }
 }
@@ -163,31 +188,25 @@ pub struct Label {
 
 impl SExpr for Label {
     fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::call("label", vec![SExprTerm::number(self.id)])
+        SExprTerm::call("label", &[SExprTerm::number(self.id)])
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct If {
-    pub condition: Tagged<Identifier>,
-    pub then: Tagged<Vec<Tagged<Statement>>>,
-    pub else_: Tagged<Vec<Tagged<Statement>>>,
+    pub condition: Ident,
+    pub then: WithTag<Vec<WithTag<FunStmt>>>,
+    pub else_: WithTag<Vec<WithTag<FunStmt>>>,
 }
 
 impl SExpr for If {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::call(
             "if",
-            vec![
+            &[
                 self.condition.to_sexpr(),
-                SExprTerm::call(
-                    "then",
-                    self.then.value.iter().map(|x| x.to_sexpr()).collect(),
-                ),
-                SExprTerm::call(
-                    "else",
-                    self.else_.value.iter().map(|x| x.to_sexpr()).collect(),
-                ),
+                SExprTerm::call("then", &self.then.value),
+                SExprTerm::call("else", &self.else_.value),
             ],
         )
     }
@@ -196,19 +215,16 @@ impl SExpr for If {
 #[derive(Clone, Debug)]
 pub struct Loop {
     pub label: Label,
-    pub body: Tagged<Vec<Tagged<Statement>>>,
+    pub body: WithTag<Vec<FunStmt>>,
 }
 
 impl SExpr for Loop {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::call(
             "loop",
-            vec![
+            &[
                 self.label.to_sexpr(),
-                SExprTerm::call(
-                    "body",
-                    self.body.value.iter().map(|x| x.to_sexpr()).collect(),
-                ),
+                SExprTerm::call("body", &self.body.value),
             ],
         )
     }
@@ -216,15 +232,15 @@ impl SExpr for Loop {
 
 #[derive(Debug, Clone)]
 pub struct InlineWasm {
-    pub input_stack: Tagged<Vec<Tagged<Identifier>>>,
-    pub output_stack: Tagged<Vec<Tagged<Identifier>>>,
-    pub wasm: Tagged<wast::core::Instruction<'static>>,
+    pub input_stack: WithTag<Vec<WithTag<Ident>>>,
+    pub output_stack: WithTag<Vec<WithTag<Ident>>>,
+    pub wasm: WithTag<wast::core::Instruction<'static>>,
 }
 
 impl SExpr for InlineWasm {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::List(vec![
-            SExprTerm::Atom("inline_wasm".to_string()),
+            SExprTerm::Symbol("inline_wasm".to_string()),
             SExprTerm::List(
                 self.input_stack
                     .value
@@ -239,35 +255,34 @@ impl SExpr for InlineWasm {
                     .map(|x| x.to_sexpr())
                     .collect(),
             ),
-            SExprTerm::Atom(format!("{:?}", self.wasm.value)),
+            SExprTerm::Symbol(format!("{:?}", self.wasm.value)),
         ])
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum Statement {
+pub enum FunStmt {
     // Loop(Label),
-    Loop(Loop),
-    Assignment(Assignment),
-    Branch(Label),
-    Break(Label),
-    Return(Identifier),
-    If(If),
-    InlineWasm(InlineWasm),
+    Loop(WithTag<Loop>),
+    Assignment(WithTag<Assignment>),
+    Branch(WithTag<Label>),
+    Break(WithTag<Label>),
+    Return(Ident),
+    If(WithTag<If>),
+    // InlineWasm(InlineWasm),
     Nop,
 }
 
-impl SExpr for Statement {
+impl SExpr for FunStmt {
     fn to_sexpr(&self) -> SExprTerm {
         match self {
-            Statement::Loop(l) => l.to_sexpr(),
-            Statement::Assignment(a) => a.to_sexpr(),
-            Statement::Branch(l) => SExprTerm::call("branch", vec![l.to_sexpr()]),
-            Statement::Break(l) => SExprTerm::call("break", vec![l.to_sexpr()]),
-            Statement::Return(i) => SExprTerm::call("return", vec![i.to_sexpr()]),
-            Statement::If(i) => i.to_sexpr(),
-            Statement::Nop => SExprTerm::atom("nop"),
-            Statement::InlineWasm(i) => i.to_sexpr(),
+            FunStmt::Loop(l) => l.to_sexpr(),
+            FunStmt::Assignment(a) => a.to_sexpr(),
+            FunStmt::Branch(l) => SExprTerm::call("branch", &[l.to_sexpr()]),
+            FunStmt::Break(l) => SExprTerm::call("break", &[l.to_sexpr()]),
+            FunStmt::Return(i) => SExprTerm::call("return", &[i.to_sexpr()]),
+            FunStmt::If(i) => i.to_sexpr(),
+            FunStmt::Nop => SExprTerm::symbol("nop"),
         }
     }
 }

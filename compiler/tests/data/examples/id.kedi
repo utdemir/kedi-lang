@@ -1,3 +1,5 @@
-fn id(fst: Number): Number {
-    return fst
+fn id fst
+    : number? fst
+    : number? @return {
+    return fst;
 }

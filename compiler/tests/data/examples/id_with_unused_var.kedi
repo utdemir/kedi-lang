@@ -1,3 +1,4 @@
-fn id fst
-    a := 99
-    return fst
+fn id fst {
+    let a = 99;
+    return fst;
+}
