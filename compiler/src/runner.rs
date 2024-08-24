@@ -1,30 +1,30 @@
-use crate::{
-    codegen, error, linker, parser, renamer, simplifier,
-    util::{kcache::KCache, wasm::WasmBytes},
-};
+use crate::{codegen, error, linker, parser, renamer, simplifier, util::wasm::WasmBytes};
 
 pub struct CompileResult {
     pub syntax: parser::syntax::Module,
     pub plain: renamer::plain::Module,
     pub simple: simplifier::simple::Module,
     pub fragment: codegen::fragment::Module,
+    pub linked: linker::linked::Module,
     pub wasm: WasmBytes,
 }
 
 pub fn runner(source: &str) -> Result<CompileResult, error::Error> {
-    let _std = stdlib();
+    // let _std = stdlib();
 
     let syntax = parser::parse(source)?;
     let plain = renamer::rename(&syntax)?;
     let simple = simplifier::run(&plain);
     let fragment = codegen::run(&simple);
-    let wasm = linker::run(&fragment);
+    let linked = linker::run(&fragment);
+    let wasm = linker::mk_wasm(&linked);
 
     Ok(CompileResult {
         syntax,
         plain,
         simple,
         fragment,
+        linked,
         wasm,
     })
 }

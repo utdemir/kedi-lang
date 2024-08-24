@@ -206,7 +206,7 @@ impl SimplifyFunImplState {
     fn widen_plain_ident(&mut self, id: &plain::Ident) -> simple::Ident {
         match id {
             plain::Ident::Local(id) => simple::Ident::Local(id.to_tagged(&mut self.tag_map)),
-            plain::Ident::Global(id) => todo!("not supported yet"), // simple::Ident::Global(id.to_tagged(&mut self.tag_map)),
+            plain::Ident::Global(_id) => todo!("not supported yet"), // simple::Ident::Global(id.to_tagged(&mut self.tag_map)),
         }
     }
 }

@@ -1,69 +1,40 @@
 use std::collections::HashMap;
 
-use wast::token::Id;
+use crate::{codegen::fragment, parser::syntax};
 
-use crate::{
-    codegen::fragment::{self, FunImpl, TopLevelStmt},
-    parser::syntax,
-    renamer::plain::GlobalIdent,
-    util::{loc::WithLoc, wasm::WasmBytes},
-};
+use super::linked;
 
-pub fn run(input: &fragment::Module) -> WasmBytes {
+pub fn run(input: &fragment::Module) -> linked::Module {
     let mut env = LinkerEnv::new();
 
     for stmt in input.statements.iter() {
         match stmt {
-            fragment::TopLevelStmt::FunDecl(fun) => env.add(fun.value.name.value),
+            fragment::TopLevelStmt::FunDecl(fun) => env.add(fun.value.name.value.clone()),
         }
     }
 
-    let linked = link(&mut env, &input);
-
-    let mut fields = vec![];
-
-    // Build the statements
-    for stmt in linked.statements {
-        match stmt {
-            fragment::TopLevelStmt::FunDecl(fun) => {
-                let body = fun.value.implementation.value.body;
-                fields.push(wast::core::ModuleField::Func(body));
-            }
-        }
-    }
-
-    // Build the module
-    let mut module = wast::core::Module {
-        span: wast::token::Span::from_offset(0),
-        id: None,
-        name: None,
-        kind: wast::core::ModuleKind::Text(fields),
-    };
-
-    let wat = module.encode().unwrap();
-
-    return WasmBytes { bytes: wat };
+    link(&mut env, &input)
 }
 
-pub fn link(env: &mut LinkerEnv, input: &fragment::Module) -> fragment::Module {
-    let mut output_statements: Vec<TopLevelStmt> = vec![];
+fn link(env: &mut LinkerEnv, input: &fragment::Module) -> linked::Module {
+    let mut output_statements: Vec<linked::TopLevelStmt> = vec![];
 
     for stmt in input.statements.iter() {
         match stmt {
             fragment::TopLevelStmt::FunDecl(fun) => {
-                output_statements.push(fragment::TopLevelStmt::FunDecl(
+                output_statements.push(linked::TopLevelStmt::FunDecl(
                     fun.map(|fun| link_function(env, fun)),
                 ));
             }
         }
     }
 
-    return fragment::Module {
+    return linked::Module {
         statements: output_statements,
     };
 }
 
-pub fn link_function(env: &mut LinkerEnv, fun: &fragment::FunDecl) -> fragment::FunDecl {
+fn link_function(env: &mut LinkerEnv, fun: &fragment::FunDecl) -> linked::FunDecl {
     let mut out_instrs = vec![];
 
     for instr in fun.implementation.value.body.iter() {
@@ -71,61 +42,23 @@ pub fn link_function(env: &mut LinkerEnv, fun: &fragment::FunDecl) -> fragment::
             fragment::Instr::Call(fragment::Call { fun: glo, arity: _ }) => {
                 let syn = fun.refs.get(glo).unwrap();
                 let id = env.resolve(syn);
-                out_instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::Call(id)));
+                out_instrs.push(linked::Instr {
+                    instr: wasm_encoder::Instruction::Call(id),
+                });
             }
-            other => {
-                out_instrs.push(other.clone());
+            fragment::Instr::Raw(r) => {
+                out_instrs.push(linked::Instr { instr: r.clone() });
             }
         }
     }
 
-    return fragment::FunDecl {
+    return linked::FunDecl {
         name: fun.name.clone(),
-        implementation: fun.implementation.map(|old_impl| FunImpl {
+        implementation: fun.implementation.map(|old_impl| linked::FunImpl {
             params: old_impl.params.clone(),
             body: out_instrs,
         }),
-        refs: HashMap::new(),
     };
-
-    // let mut idx = 0;
-    // let instrs = match &mut fun.implementation.value.body.kind {
-    //     wast::core::FuncKind::Inline { expression, .. } => &mut expression.instrs,
-    //     _ => panic!("unexpected function kind"),
-    // };
-    // loop {
-    //     if idx > instrs.len() - 2 {
-    //         break;
-    //     }
-
-    //     let [ref curr, ref next] = instrs[idx..idx + 2] else {
-    //         break;
-    //     };
-
-    //     match (curr, next) {
-    //         (
-    //             wast::core::Instruction::I32Const(val),
-    //             wast::core::Instruction::CallIndirect { .. },
-    //         ) => {
-    //             let name = ustr::ustr(
-    //                 fun.refs
-    //                     .get(&GlobalIdent { id: *val as u32 })
-    //                     .unwrap_or_else(|| panic!("unknown function index: {}", val))
-    //                     .0
-    //                     .as_str(),
-    //             )
-    //             .as_str();
-    //             instrs[idx] = wast::core::Instruction::Nop;
-    //             instrs[idx + 1] = wast::core::Instruction::Call(wast::token::Index::Id(
-    //                 wast::token::Id::new(name, wast::token::Span::from_offset(0)),
-    //             ));
-    //             idx += 2;
-    //         }
-    //         _ => {
-    //             idx += 1;
-    //         }
-    //     }
-    // }
 }
 
 struct LinkerEnv {

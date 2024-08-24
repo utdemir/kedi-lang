@@ -27,3 +27,7 @@ fn sorted? arr
 
     return true;
 }
+
+: sort x == sort (reverse sort)
+: map f x == 
+: sort [1, 4, 3] == [1, 3, 4]

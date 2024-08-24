@@ -12,14 +12,35 @@ unsafe namespace kv {
     fn put str str {
         ....
     }
+
+    fn get_or_set
 }
 
-mock namespace kv {
+
+namespace {
+    private BTree = Leaf | Node Left Right
+
+
+    empty : ..
+
+    add : .. 
+}
+/// 
+
+namespace kv {
     struct KV {
+        filepath: string
+    } mock {
         values: Array(string, string)
     }
 
     fn get str
+        : string? str
+    {
+        ...
+    }
+
+    mock fn get str
         : string? str
     {
         for i in range(0, this.values.length) {
@@ -31,7 +52,5 @@ mock namespace kv {
         return null;
     }
 
-    fn put str str {
-        this.values.push((str, str));
-    }
+    fn get_or_set 
 }

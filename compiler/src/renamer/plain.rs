@@ -170,36 +170,6 @@ impl Located for FunCall {
 }
 
 #[derive(Debug, Clone)]
-pub struct InlineWasm {
-    pub input_stack: LVec<WithLoc<LocalIdent>>,
-    pub output_stack: LVec<WithLoc<LocalIdent>>,
-    pub wasm: WithLoc<wast::core::Instruction<'static>>,
-}
-
-impl SExpr for InlineWasm {
-    fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::List(vec![
-            SExprTerm::Symbol("inline_wasm".to_string()),
-            SExprTerm::List(
-                self.input_stack
-                    .value
-                    .iter()
-                    .map(|x| x.to_sexpr())
-                    .collect(),
-            ),
-            SExprTerm::List(
-                self.output_stack
-                    .value
-                    .iter()
-                    .map(|x| x.to_sexpr())
-                    .collect(),
-            ),
-            SExprTerm::symbol(format!("{:?}", self.wasm.value).as_str()),
-        ])
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct Return(pub Expr);
 pub type LReturn = WithLoc<Return>;
 

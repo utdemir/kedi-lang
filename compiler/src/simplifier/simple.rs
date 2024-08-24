@@ -230,36 +230,6 @@ impl SExpr for Loop {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct InlineWasm {
-    pub input_stack: WithTag<Vec<WithTag<Ident>>>,
-    pub output_stack: WithTag<Vec<WithTag<Ident>>>,
-    pub wasm: WithTag<wast::core::Instruction<'static>>,
-}
-
-impl SExpr for InlineWasm {
-    fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::List(vec![
-            SExprTerm::Symbol("inline_wasm".to_string()),
-            SExprTerm::List(
-                self.input_stack
-                    .value
-                    .iter()
-                    .map(|x| x.to_sexpr())
-                    .collect(),
-            ),
-            SExprTerm::List(
-                self.output_stack
-                    .value
-                    .iter()
-                    .map(|x| x.to_sexpr())
-                    .collect(),
-            ),
-            SExprTerm::Symbol(format!("{:?}", self.wasm.value)),
-        ])
-    }
-}
-
 #[derive(Clone, Debug)]
 pub enum FunStmt {
     // Loop(Label),

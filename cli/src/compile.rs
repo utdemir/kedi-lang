@@ -28,8 +28,12 @@ pub fn compile(opts: CompileArgs) -> Result<(), miette::Report> {
         write_sexpr(&fragment, &out_fragment)
     }
 
-    let wasm = kedi_lang::linker::run(fragment);
+    let linked = kedi_lang::linker::run(&fragment);
+    if let Some(out_linked) = opts.out_linked {
+        write_sexpr(&linked, &out_linked)
+    }
 
+    let wasm = kedi_lang::linker::mk_wasm(&linked);
     if let Some(out_wat) = opts.out_wat {
         let txt = match wasm.to_wat() {
             Some(wat) => wat.text,

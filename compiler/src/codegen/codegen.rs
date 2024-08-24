@@ -1,10 +1,10 @@
 #![allow(unused_variables)]
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use wasm_encoder;
 
-use super::fragment::{self, FunDecl, FunImpl, Instr};
+use super::fragment;
 use crate::{renamer::plain, simplifier::simple};
 
 pub fn run(input: &simple::Module) -> fragment::Module {
@@ -15,7 +15,7 @@ pub fn run(input: &simple::Module) -> fragment::Module {
             simple::TopLevelStmt::FunDecl(fun) => {
                 let implementation = fun.value.implementation.map(codegen_function);
                 let f = fun.map(|fun| {
-                    return FunDecl {
+                    return fragment::FunDecl {
                         name: fun.name.clone(),
                         implementation,
                         refs: fun.refs.clone(),
@@ -31,7 +31,7 @@ pub fn run(input: &simple::Module) -> fragment::Module {
 }
 
 fn codegen_function(input: &simple::FunImpl) -> fragment::FunImpl {
-    let mut instructions: Vec<Instr> = vec![];
+    let mut instructions: Vec<fragment::Instr> = vec![];
     let mut state = CodegenState::new();
 
     for param in input.parameters.value.iter() {
@@ -59,17 +59,23 @@ fn codegen_function(input: &simple::FunImpl) -> fragment::FunImpl {
     };
 }
 
-fn codegen_statement(state: &mut CodegenState, instrs: &mut Vec<Instr>, stmt: &simple::FunStmt) {
+fn codegen_statement(
+    state: &mut CodegenState,
+    instrs: &mut Vec<fragment::Instr>,
+    stmt: &simple::FunStmt,
+) {
     match stmt {
         simple::FunStmt::Assignment(l_assignment) => {
             let simple::Assignment { value, target } = &l_assignment.value;
 
             match value {
                 simple::AssignmentValue::LitNum(i) => {
-                    instrs.push(Instr::Raw(wasm_encoder::Instruction::I32Const(i.value.0)));
+                    instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::I32Const(
+                        i.value.0,
+                    )));
                 }
                 simple::AssignmentValue::Ident(ref id) => {
-                    instrs.push(Instr::Raw(wasm_encoder::Instruction::LocalGet(
+                    instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::LocalGet(
                         state.resolve_simple_ident(id),
                     )));
                 }
@@ -78,27 +84,27 @@ fn codegen_statement(state: &mut CodegenState, instrs: &mut Vec<Instr>, stmt: &s
                     let args = &l_call.value.arguments.value;
 
                     for arg in args.iter() {
-                        instrs.push(Instr::Raw(wasm_encoder::Instruction::LocalGet(
+                        instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::LocalGet(
                             state.resolve_simple_ident(arg),
                         )));
                     }
 
-                    instrs.push(Instr::Call(fragment::Call {
+                    instrs.push(fragment::Instr::Call(fragment::Call {
                         fun: id,
                         arity: args.len(),
                     }));
                 }
             }
 
-            instrs.push(Instr::Raw(wasm_encoder::Instruction::LocalSet(
+            instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::LocalSet(
                 state.resolve_simple_ident(&target),
             )));
         }
         simple::FunStmt::Return(id) => {
-            instrs.push(Instr::Raw(wasm_encoder::Instruction::LocalGet(
+            instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::LocalGet(
                 state.resolve_simple_ident(id),
             )));
-            instrs.push(Instr::Raw(wasm_encoder::Instruction::Return));
+            instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::Return));
         }
         simple::FunStmt::Nop => {}
         simple::FunStmt::If(if_) => {
@@ -215,53 +221,3 @@ impl CodegenState {
     //     }
     // }
 }
-
-// Utils
-
-fn empty_span() -> wast::token::Span {
-    return wast::token::Span::from_offset(0);
-}
-
-// // Hack, obviously.
-// fn leak_str(s: String) -> &'static str {
-//     return ustr::ustr(&s).as_str();
-// }
-
-// fn local_identifier_to_id(id: &plain::LocalIdent) -> wast::token::Id<'static> {
-//     let str: &'static str = leak_str(format!("local#{}", id.id));
-//     return wast::token::Id::new(&str, empty_span());
-// }
-
-// fn _local_identifier_to_uid(id: &plain::LocalIdent) -> wast::token::Index<'static> {
-//     let id = wast::token::Index::Id(local_identifier_to_id(id));
-//     return id;
-// }
-// fn global_identifier_to_id(id: &plain::GlobalIdent) -> wast::token::Id<'static> {
-//     let str: &'static str = leak_str(format!("global#{}", id.id));
-//     return wast::token::Id::new(&str, empty_span());
-// }
-
-// fn _global_identifier_to_uid(id: &plain::GlobalIdent) -> wast::token::Index<'static> {
-//     return wast::token::Index::Id(global_identifier_to_id(id));
-// }
-
-// fn single_use_identifier_to_id(id: &simple::SingleUseIdent) -> wast::token::Id<'static> {
-//     let str: &'static str = leak_str(format!("single_use#{}", id.id));
-//     return wast::token::Id::new(&str, empty_span());
-// }
-
-// fn _single_use_identifier_to_uid(id: &simple::SingleUseIdent) -> wast::token::Index<'static> {
-//     return wast::token::Index::Id(single_use_identifier_to_id(id));
-// }
-
-// fn simple_identifier_to_id(id: &simple::Ident) -> wast::token::Id<'static> {
-//     match id {
-//         simple::Ident::Local(id) => local_identifier_to_id(&id.value),
-//         // simple::Ident::Global(id) => global_identifier_to_id(&id.value),
-//         simple::Ident::SingleUse(id) => single_use_identifier_to_id(&id.value),
-//     }
-// }
-
-// fn simple_identifier_to_uid(id: &simple::Ident) -> wast::token::Index<'static> {
-//     return wast::token::Index::Id(simple_identifier_to_id(id));
-// }

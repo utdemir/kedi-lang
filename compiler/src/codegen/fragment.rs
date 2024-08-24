@@ -46,13 +46,18 @@ impl pp::SExpr for FunDecl {
     }
 }
 
+pub type FunImpl = FunImpl_<Instr>;
+
 #[derive(Debug, Clone)]
-pub struct FunImpl {
+pub struct FunImpl_<InstrTy> {
     pub params: Vec<wasm_encoder::ValType>,
-    pub body: Vec<Instr>,
+    pub body: Vec<InstrTy>,
 }
 
-impl pp::SExpr for FunImpl {
+impl<InstrTy> pp::SExpr for FunImpl_<InstrTy>
+where
+    InstrTy: pp::SExpr,
+{
     fn to_sexpr(&self) -> pp::SExprTerm {
         pp::SExprTerm::List(vec![
             pp::SExprTerm::call(
@@ -63,10 +68,7 @@ impl pp::SExpr for FunImpl {
                     .map(|x| pp::SExprTerm::symbol(&format!("{:?}", x)))
                     .collect::<Vec<_>>(),
             ),
-            pp::SExprTerm::call(
-                "body",
-                &[pp::SExprTerm::symbol(&format!("{:#?}", self.body))],
-            ),
+            pp::SExprTerm::call("body", &self.body),
         ])
     }
 }
