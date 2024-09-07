@@ -1,5 +1,19 @@
 # kedi-lang
 
+## Features
+
+- [x] functions
+- [x] i32
+- [x] variables
+- [x] conditionals & loops
+- [ ] other stack types
+- [ ] structs 
+- [ ] arrays
+- [ ] validation w/property-based testing
+- [ ] validation w/fuzzing
+- [ ] standard library
+- [ ] io
+
 ### Components
 
 * Phases:
