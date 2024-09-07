@@ -186,7 +186,7 @@ pub enum FunStmt {
     LetDecl(LLetDecl),
     While(LWhile),
     Assignment(LAssignment),
-    // InlineWasm(Located<InlineWasm>),
+    If(LIf),
 }
 
 impl SExpr for FunStmt {
@@ -202,7 +202,7 @@ impl SExpr for FunStmt {
             FunStmt::LetDecl(decl) => decl.to_sexpr(),
             FunStmt::While(while_) => while_.to_sexpr(),
             FunStmt::Assignment(assignment) => assignment.to_sexpr(),
-            // FunStmt::InlineWasm(inline_wasm) => inline_wasm.to_sexpr(),
+            FunStmt::If(if_) => if_.to_sexpr(),
         }
     }
 }
@@ -258,6 +258,35 @@ impl SExpr for Assignment {
             self.id.to_sexpr(),
             self.value.to_sexpr(),
         ])
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct If {
+    pub condition: Expr,
+    pub then: LVec<FunStmt>,
+    pub else_: Option<LVec<FunStmt>>,
+}
+
+pub type LIf = WithLoc<If>;
+
+impl SExpr for If {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::call(
+            "if",
+            &[
+                self.condition.to_sexpr(),
+                SExprTerm::call("then", &self.then.value),
+                SExprTerm::call(
+                    "else",
+                    &self
+                        .else_
+                        .as_ref()
+                        .map(|x| x.value.clone())
+                        .unwrap_or_default(),
+                ),
+            ],
+        )
     }
 }
 

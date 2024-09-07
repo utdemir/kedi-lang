@@ -8,6 +8,19 @@ pub struct Module {
     pub statements: Vec<TopLevelStmt>,
 }
 
+impl Module {
+    pub fn add(&self, other: &Module) -> Module {
+        Module {
+            statements: self
+                .statements
+                .iter()
+                .chain(other.statements.iter())
+                .cloned()
+                .collect(),
+        }
+    }
+}
+
 impl pp::SExpr for Module {
     fn to_sexpr(&self) -> pp::SExprTerm {
         pp::SExprTerm::List(self.statements.iter().map(|stmt| stmt.to_sexpr()).collect())

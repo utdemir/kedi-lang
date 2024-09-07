@@ -7,13 +7,15 @@ use super::linked;
 pub fn run(input: &fragment::Module) -> linked::Module {
     let mut env = LinkerEnv::new();
 
-    for stmt in input.statements.iter() {
+    let with_stdlib = super::prims::prims().add(&input);
+
+    for stmt in with_stdlib.statements.iter() {
         match stmt {
             fragment::TopLevelStmt::FunDecl(fun) => env.add(fun.value.name.value.clone()),
         }
     }
 
-    link(&mut env, &input)
+    link(&mut env, &with_stdlib)
 }
 
 fn link(env: &mut LinkerEnv, input: &fragment::Module) -> linked::Module {
@@ -87,7 +89,7 @@ impl LinkerEnv {
     fn resolve(&self, id: &syntax::Ident) -> u32 {
         self.ids
             .get(&id)
-            .unwrap_or_else(|| panic!("unknown id: {:?}", id))
+            .unwrap_or_else(|| panic!("unknown id: {:?}, available: {:?}", id, self.ids))
             .clone()
     }
 }

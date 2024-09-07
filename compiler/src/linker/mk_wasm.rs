@@ -70,11 +70,6 @@ fn locals(instrs: &[linked::Instr]) -> Vec<wasm_encoder::ValType> {
             } => {
                 locals.insert(*l);
             }
-            linked::Instr {
-                instr: wasm_encoder::Instruction::LocalGet(l),
-            } => {
-                locals.insert(*l);
-            }
             _ => {}
         }
     }

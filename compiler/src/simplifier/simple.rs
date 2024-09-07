@@ -22,7 +22,6 @@ impl SExpr for SingleUseIdent {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Ident {
     Local(WithTag<plain::LocalIdent>),
-    // Global(WithTag<plain::GlobalIdent>),
     SingleUse(WithTag<SingleUseIdent>),
 }
 
@@ -30,7 +29,6 @@ impl SExpr for Ident {
     fn to_sexpr(&self) -> SExprTerm {
         match self {
             Ident::Local(l) => l.to_sexpr(),
-            // Ident::Global(g) => g.to_sexpr(),
             Ident::SingleUse(u) => u.to_sexpr(),
         }
     }
@@ -40,7 +38,6 @@ impl Tagged for Ident {
     fn tag(&self) -> loc::Tag {
         match self {
             Ident::Local(l) => l.tag(),
-            // Ident::Global(g) => g.tag(),
             Ident::SingleUse(u) => u.tag(),
         }
     }
@@ -195,8 +192,8 @@ impl SExpr for Label {
 #[derive(Clone, Debug)]
 pub struct If {
     pub condition: Ident,
-    pub then: WithTag<Vec<WithTag<FunStmt>>>,
-    pub else_: WithTag<Vec<WithTag<FunStmt>>>,
+    pub then: WithTag<Vec<FunStmt>>,
+    pub else_: Option<WithTag<Vec<FunStmt>>>,
 }
 
 impl SExpr for If {
@@ -206,7 +203,7 @@ impl SExpr for If {
             &[
                 self.condition.to_sexpr(),
                 SExprTerm::call("then", &self.then.value),
-                SExprTerm::call("else", &self.else_.value),
+                SExprTerm::call("else", &self.else_),
             ],
         )
     }
@@ -214,19 +211,12 @@ impl SExpr for If {
 
 #[derive(Clone, Debug)]
 pub struct Loop {
-    pub label: Label,
     pub body: WithTag<Vec<FunStmt>>,
 }
 
 impl SExpr for Loop {
     fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::call(
-            "loop",
-            &[
-                self.label.to_sexpr(),
-                SExprTerm::call("body", &self.body.value),
-            ],
-        )
+        SExprTerm::call("loop", &[SExprTerm::call("body", &self.body.value)])
     }
 }
 
@@ -235,10 +225,9 @@ pub enum FunStmt {
     // Loop(Label),
     Loop(WithTag<Loop>),
     Assignment(WithTag<Assignment>),
-    Branch(WithTag<Label>),
-    Break(WithTag<Label>),
+    Break(),
     Return(Ident),
-    If(WithTag<If>),
+    If(If),
     // InlineWasm(InlineWasm),
     Nop,
 }
@@ -248,8 +237,7 @@ impl SExpr for FunStmt {
         match self {
             FunStmt::Loop(l) => l.to_sexpr(),
             FunStmt::Assignment(a) => a.to_sexpr(),
-            FunStmt::Branch(l) => SExprTerm::call("branch", &[l.to_sexpr()]),
-            FunStmt::Break(l) => SExprTerm::call("break", &[l.to_sexpr()]),
+            FunStmt::Break() => SExprTerm::symbol("break"),
             FunStmt::Return(i) => SExprTerm::call("return", &[i.to_sexpr()]),
             FunStmt::If(i) => i.to_sexpr(),
             FunStmt::Nop => SExprTerm::symbol("nop"),

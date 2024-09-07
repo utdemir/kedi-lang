@@ -10,6 +10,19 @@ pub struct Module {
     pub statements: Vec<TopLevelStmt>,
 }
 
+impl Module {
+    pub fn add(&self, other: &Module) -> Module {
+        Module {
+            statements: self
+                .statements
+                .iter()
+                .chain(other.statements.iter())
+                .cloned()
+                .collect(),
+        }
+    }
+}
+
 impl pp::SExpr for Module {
     fn to_sexpr(&self) -> pp::SExprTerm {
         pp::SExprTerm::List(self.statements.iter().map(|stmt| stmt.to_sexpr()).collect())
@@ -42,6 +55,14 @@ impl pp::SExpr for FunDecl {
             pp::SExprTerm::Symbol("fun".to_string()),
             self.name.to_sexpr(),
             self.implementation.to_sexpr(),
+            pp::SExprTerm::call(
+                "refs",
+                &self
+                    .refs
+                    .iter()
+                    .map(|(k, v)| pp::SExprTerm::call("ref", &[k.to_sexpr(), v.to_sexpr()]))
+                    .collect::<Vec<_>>(),
+            ),
         ])
     }
 }

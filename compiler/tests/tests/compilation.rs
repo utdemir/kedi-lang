@@ -1,5 +1,5 @@
-#[cfg(test)]
-mod util;
+use crate::mk_tests;
+use crate::util;
 
 mk_tests! {
     id: test("id"),
@@ -7,6 +7,7 @@ mk_tests! {
     fibonacci: test("fibonacci"),
     id_with_unused_var: test("id_with_unused_var"),
     two_funs: test("two_funs"),
+    if_: test("if"),
 }
 
 fn test(example_name: &str) {

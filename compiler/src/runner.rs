@@ -10,13 +10,16 @@ pub struct CompileResult {
 }
 
 pub fn runner(source: &str) -> Result<CompileResult, error::Error> {
-    // let _std = stdlib();
+    let std_ = stdlib();
 
     let syntax = parser::parse(source)?;
     let plain = renamer::rename(&syntax)?;
     let simple = simplifier::run(&plain);
     let fragment = codegen::run(&simple);
-    let linked = linker::run(&fragment);
+
+    let combined = std_.add(&fragment);
+
+    let linked = linker::run(&combined);
     let wasm = linker::mk_wasm(&linked);
 
     Ok(CompileResult {
@@ -30,7 +33,7 @@ pub fn runner(source: &str) -> Result<CompileResult, error::Error> {
 }
 
 pub fn stdlib() -> codegen::fragment::Module {
-    let str = include_str!("stdlib.kedi");
+    let str = include_str!("../lib/prelude.kedi");
     let syntax = parser::parse(str).unwrap();
     let plain = renamer::rename(&syntax).unwrap();
     let simple = simplifier::run(&plain);

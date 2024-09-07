@@ -89,25 +89,21 @@ fn simplify_block(
                 let tag = l_while.location.to_tag(&mut state.tag_map);
                 let while_ = &l_while.value;
 
-                let label = state.get_next_label();
                 let mut loop_instrs = vec![];
 
                 // Add the break condition
                 let condition = state.compile_expr(&mut loop_instrs, &while_.condition);
-                loop_instrs.push(simple::FunStmt::If(condition.tag().attach(simple::If {
+                loop_instrs.push(simple::FunStmt::If(simple::If {
                     condition,
                     then: condition.tag().attach(vec![]),
-                    else_: condition.tag().attach(vec![condition.tag().attach(
-                        simple::FunStmt::Break(condition.tag().attach(label.clone())),
-                    )]),
-                })));
+                    else_: Some(condition.tag().attach(vec![simple::FunStmt::Break()])),
+                }));
 
                 // Add the rest of the body
                 simplify_block(state, &mut loop_instrs, &while_.body.value);
 
                 // Insert the loop
                 let loop_ = simple::Loop {
-                    label,
                     body: tag.attach(loop_instrs),
                 };
 
@@ -125,6 +121,31 @@ fn simplify_block(
                     },
                 )));
             }
+            plain::FunStmt::If(l_if) => {
+                let if_ = &l_if.value;
+
+                let condition = state.compile_expr(instrs, &if_.condition);
+                let mut then_instrs = vec![];
+                let mut else_instrs = vec![];
+
+                simplify_block(state, &mut then_instrs, &if_.then.value);
+                if let Some(else_) = &if_.else_ {
+                    simplify_block(state, &mut else_instrs, &else_.value);
+                }
+
+                instrs.push(simple::FunStmt::If(simple::If {
+                    condition,
+                    then: if_
+                        .condition
+                        .location()
+                        .to_tag(&mut state.tag_map)
+                        .attach(then_instrs),
+                    else_: if_
+                        .else_
+                        .as_ref()
+                        .map(|e| e.location().to_tag(&mut state.tag_map).attach(else_instrs)),
+                }));
+            }
             _ => todo!(),
         }
     }
@@ -132,7 +153,6 @@ fn simplify_block(
 
 struct SimplifyFunImplState {
     next_single_use_identifier: u32,
-    next_loop_label: u32,
     tag_map: loc::TagMap,
 }
 
@@ -141,7 +161,6 @@ impl SimplifyFunImplState {
         SimplifyFunImplState {
             next_single_use_identifier: 1,
             tag_map: loc::TagMap::new(),
-            next_loop_label: 1,
         }
     }
 
@@ -195,12 +214,6 @@ impl SimplifyFunImplState {
             }
             _ => todo!(),
         }
-    }
-
-    fn get_next_label(&mut self) -> simple::Label {
-        let id = self.next_loop_label;
-        self.next_loop_label += 1;
-        return simple::Label { id };
     }
 
     fn widen_plain_ident(&mut self, id: &plain::Ident) -> simple::Ident {

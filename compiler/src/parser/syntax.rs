@@ -144,6 +144,7 @@ pub enum FunStmt {
     LetDecl(WithLoc<LetDecl>),
     While(WithLoc<While>),
     Assignment(WithLoc<Assignment>),
+    If(WithLoc<If>),
 }
 
 impl SExpr for FunStmt {
@@ -154,6 +155,7 @@ impl SExpr for FunStmt {
             FunStmt::LetDecl(ref x) => x.to_sexpr(),
             FunStmt::While(ref x) => x.to_sexpr(),
             FunStmt::Assignment(ref x) => x.to_sexpr(),
+            FunStmt::If(ref x) => x.to_sexpr(),
         }
     }
 }
@@ -166,6 +168,7 @@ impl Located for FunStmt {
             FunStmt::LetDecl(ref x) => x.location(),
             FunStmt::While(ref x) => x.location(),
             FunStmt::Assignment(ref x) => x.location(),
+            FunStmt::If(ref x) => x.location(),
         }
     }
 }
@@ -241,6 +244,26 @@ impl SExpr for Assignment {
             self.name.to_sexpr(),
             self.value.to_sexpr(),
         ])
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct If {
+    pub condition: Expr,
+    pub then: WithLoc<Vec<FunStmt>>,
+    pub else_: Option<WithLoc<Vec<FunStmt>>>,
+}
+
+impl SExpr for If {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::call(
+            "if",
+            &[
+                self.condition.to_sexpr(),
+                SExprTerm::call("then", &self.then.value),
+                SExprTerm::call("else", &self.else_),
+            ],
+        )
     }
 }
 

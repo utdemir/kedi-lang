@@ -108,44 +108,65 @@ fn codegen_statement(
         }
         simple::FunStmt::Nop => {}
         simple::FunStmt::If(if_) => {
-            // let simple::If {
-            //     condition,
-            //     then,
-            //     else_,
-            // } = &if_.value;
+            let simple::If {
+                condition,
+                then,
+                else_,
+            } = &if_;
 
-            // let ret = wast::core::Instruction::If(Box::new(wast::core::BlockType {
-            //     label: None,
-            //     label_name: None,
-            //     ty: wast::core::TypeUse {
-            //         index: None,
-            //         inline: None,
-            //     },
-            // }));
+            instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::LocalGet(
+                state.resolve_simple_ident(condition),
+            )));
+            instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::If(
+                wasm_encoder::BlockType::Empty,
+            )));
 
-            todo!("codegen_statement: If");
+            state.with_non_break_target(|state| {
+                for stmt in then.value.iter() {
+                    codegen_statement(state, instrs, &stmt);
+                }
+            });
+
+            if let Some(else_) = else_ {
+                instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::Else));
+
+                state.with_non_break_target(|state| {
+                    for stmt in else_.value.iter() {
+                        codegen_statement(state, instrs, &stmt);
+                    }
+                });
+            }
+
+            instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::End));
         }
         simple::FunStmt::Loop(loop_) => {
-            // let simple::Loop { label, body } = &loop_.value;
+            state.with_break_target(|state| {
+                instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::Block(
+                    wasm_encoder::BlockType::Empty,
+                )));
 
-            // let ret = wast::core::Instruction::Loop(Box::new(wast::core::BlockType {
-            //     label: None,
-            //     label_name: None,
-            //     ty: wast::core::TypeUse {
-            //         index: None,
-            //         inline: None,
-            //     },
-            // }));
+                state.with_non_break_target(|state| {
+                    instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::Loop(
+                        wasm_encoder::BlockType::Empty,
+                    )));
 
-            todo!("codegen_statement: Loop");
+                    state.with_break_target(|state| {
+                        for stmt in loop_.value.body.value.iter() {
+                            codegen_statement(state, instrs, stmt);
+                        }
+                    });
+
+                    instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::Br(0)));
+                    instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::End));
+                });
+
+                instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::End));
+            });
         }
-        simple::FunStmt::Break(_label) => {
-            // instrs.push(wast::core::Instruction::Nop);
-            todo!("codegen_statement: Break");
-        }
-        simple::FunStmt::Branch(_label) => {
-            // instrs.push(wast::core::Instruction::Nop);
-            todo!("codegen_statement: Branch");
+        simple::FunStmt::Break() => {
+            instrs.push(fragment::Instr::Raw(wasm_encoder::Instruction::Br(
+                state.depth_to_loop.last().unwrap() + 1,
+            )));
         }
     }
 }
@@ -156,7 +177,8 @@ struct CodegenState {
     params: HashMap<plain::LocalIdent, u32>,
     locals: HashMap<plain::LocalIdent, u32>,
     single_uses: HashMap<simple::SingleUseIdent, u32>,
-    next_local_id: u32,
+
+    depth_to_loop: Vec<u32>,
 }
 
 impl CodegenState {
@@ -165,13 +187,16 @@ impl CodegenState {
             params: HashMap::new(),
             locals: HashMap::new(),
             single_uses: HashMap::new(),
-            next_local_id: 0,
+            depth_to_loop: vec![],
         };
     }
 
     fn register_param(&mut self, param: &plain::LocalIdent) {
-        self.params.insert(param.clone(), self.next_local_id);
-        self.next_local_id += 1;
+        if !self.locals.is_empty() || !self.single_uses.is_empty() {
+            panic!("register_param: locals or single_uses is not empty");
+        }
+
+        self.params.insert(param.clone(), self.params.len() as u32);
     }
 
     fn resolve_local(&mut self, local: &plain::LocalIdent) -> u32 {
@@ -183,9 +208,8 @@ impl CodegenState {
             return *x;
         }
 
-        let id = self.next_local_id;
-        self.next_local_id += 1;
-
+        let id =
+            self.params.len() as u32 + self.locals.len() as u32 + self.single_uses.len() as u32;
         self.locals.insert(local.clone(), id);
         return id;
     }
@@ -195,8 +219,8 @@ impl CodegenState {
             return *x;
         }
 
-        let id = self.next_local_id;
-        self.next_local_id += 1;
+        let id =
+            self.params.len() as u32 + self.locals.len() as u32 + self.single_uses.len() as u32;
 
         self.single_uses.insert(single_use.clone(), id);
         return id;
@@ -207,6 +231,24 @@ impl CodegenState {
             simple::Ident::Local(id) => self.resolve_local(&id.value),
             simple::Ident::SingleUse(id) => self.resolve_single_use(&id.value),
         }
+    }
+
+    fn with_break_target(&mut self, f: impl FnOnce(&mut Self)) {
+        self.depth_to_loop.push(0);
+        f(self);
+        self.depth_to_loop.pop();
+    }
+
+    fn with_non_break_target(&mut self, f: impl FnOnce(&mut Self)) {
+        if let Some(x) = self.depth_to_loop.last_mut() {
+            *x += 1;
+        };
+
+        f(self);
+
+        if let Some(x) = self.depth_to_loop.last_mut() {
+            *x -= 1;
+        };
     }
 
     // fn resolve_local(&mut self, local: &plain::LocalIdent) -> u32 {

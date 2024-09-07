@@ -73,6 +73,7 @@ pub FunStmt: FunStmt = {
     <stmt:L<WithSemi<Assignment>>> => FunStmt::Assignment(stmt),
     <stmt:L<WithSemi<LetDecl>>> => FunStmt::LetDecl(stmt),
     <stmt:L<While>> => FunStmt::While(stmt),
+    <stmt:L<If>> => FunStmt::If(stmt),
 };
 
 pub Return: Return = {
@@ -89,6 +90,19 @@ pub LetDecl : LetDecl = {
 
 pub While: While = {
     "while" <condition:Expr> <body:L<Block>> => While { condition, body },
+};
+
+pub If: If = {
+    <bare:IfBare> => bare,
+    <full:IfFull> => full,
+};
+
+pub IfBare: If = {
+    "if" <condition:Expr> <then:L<Block>> => If { condition, then, else_: None },
+};
+
+pub IfFull: If = {
+    "if" <condition:Expr> <then:L<Block>> "else" <else_:L<Block>> => If { condition, then, else_: Some(else_) },
 };
 
 pub Module: Module = {

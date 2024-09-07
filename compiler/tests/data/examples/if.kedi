@@ -1,0 +1,13 @@
+fn is_greater_than_five fst
+    : number? fst
+    : bool? @return {
+    let ret = 2;
+    
+    if gt? fst 5 {
+        ret = 1;
+    } else {
+        ret = 0;
+    }
+
+    return ret;
+}

@@ -117,6 +117,36 @@ fn rename_fun_statement(
             Ok(plain::FunStmt::Assignment(ret))
         }
 
+        syntax::FunStmt::If(if_stmt) => {
+            let ret = if_stmt.map_result(|if_stmt| {
+                let condition = rename_expr(env, &if_stmt.condition);
+                let then = if_stmt.then.map_result(|then| {
+                    then.into_iter()
+                        .map(|stmt| rename_fun_statement(env, &stmt))
+                        .collect::<Result<Vec<_>, _>>()
+                })?;
+                let else_ = if_stmt
+                    .else_
+                    .as_ref()
+                    .map(|else_| {
+                        else_.map_result(|else_| {
+                            else_
+                                .into_iter()
+                                .map(|stmt| rename_fun_statement(env, &stmt))
+                                .collect::<Result<Vec<_>, _>>()
+                        })
+                    })
+                    .transpose()?;
+                Ok::<_, Error>(plain::If {
+                    condition,
+                    then,
+                    else_,
+                })
+            })?;
+
+            Ok(plain::FunStmt::If(ret))
+        }
+
         otherwise => unimplemented!("{:?}", otherwise),
     }
 }

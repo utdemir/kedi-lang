@@ -5,6 +5,8 @@ pub fn compile(opts: CompileArgs) -> Result<(), miette::Report> {
     // Read input file.
     let contents = opts.entry.read_to_string().expect("Could not read file");
 
+    let stdlib_ = kedi_lang::runner::stdlib();
+
     let syntax =
         kedi_lang::parser::parse(&contents).map_err(|e| annotate_error(e, contents.clone()))?;
     if let Some(out_syntax) = opts.out_syntax {
@@ -23,7 +25,9 @@ pub fn compile(opts: CompileArgs) -> Result<(), miette::Report> {
         write_sexpr(&simple, &out_simple)
     }
 
-    let fragment = kedi_lang::codegen::run(&simple);
+    let fragment_ = kedi_lang::codegen::run(&simple);
+    let fragment = stdlib_.add(&fragment_);
+
     if let Some(out_fragment) = opts.out_fragment {
         write_sexpr(&fragment, &out_fragment)
     }
