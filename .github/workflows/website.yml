@@ -28,7 +28,7 @@ jobs:
         node-version: '20.x'
 
     # Build Rust component
-    - run: cargo xtask build-website
+    - run: cargo xtask build-compiler-web-artifacts
 
     # Build website
     - run: npm install
