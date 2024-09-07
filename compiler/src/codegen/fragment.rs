@@ -45,6 +45,7 @@ impl pp::SExpr for TopLevelStmt {
 #[derive(Debug, Clone)]
 pub struct FunDecl {
     pub name: WithLoc<syntax::Ident>,
+    pub export: bool,
     pub implementation: WithLoc<FunImpl>,
     pub refs: HashMap<plain::GlobalIdent, syntax::Ident>,
 }
@@ -54,6 +55,7 @@ impl pp::SExpr for FunDecl {
         pp::SExprTerm::List(vec![
             pp::SExprTerm::Symbol("fun".to_string()),
             self.name.to_sexpr(),
+            pp::SExprTerm::call("export", &[self.export]),
             self.implementation.to_sexpr(),
             pp::SExprTerm::call(
                 "refs",

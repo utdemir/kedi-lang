@@ -43,6 +43,7 @@ impl pp::SExpr for TopLevelStmt {
 #[derive(Debug, Clone)]
 pub struct FunDecl {
     pub name: WithLoc<syntax::Ident>,
+    pub export: bool,
     pub implementation: WithLoc<FunImpl>,
 }
 
@@ -50,7 +51,11 @@ impl pp::SExpr for FunDecl {
     fn to_sexpr(&self) -> pp::SExprTerm {
         pp::SExprTerm::call(
             "fun",
-            &[self.name.to_sexpr(), self.implementation.to_sexpr()],
+            &[
+                self.name.to_sexpr(),
+                pp::SExprTerm::call("export", &[self.export]),
+                self.implementation.to_sexpr(),
+            ],
         )
     }
 }

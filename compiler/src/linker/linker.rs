@@ -56,6 +56,7 @@ fn link_function(env: &mut LinkerEnv, fun: &fragment::FunDecl) -> linked::FunDec
 
     return linked::FunDecl {
         name: fun.name.clone(),
+        export: fun.export,
         implementation: fun.implementation.map(|old_impl| linked::FunImpl {
             params: old_impl.params.clone(),
             body: out_instrs,

@@ -24,11 +24,13 @@ pub fn mk_wasm(module: &linked::Module) -> WasmBytes {
         match stmt {
             linked::TopLevelStmt::FunDecl(fun) => {
                 functions.function(ix as u32);
-                exports.export(
-                    &fun.value.name.value.0,
-                    wasm_encoder::ExportKind::Func,
-                    ix as u32,
-                );
+                if fun.value.export {
+                    exports.export(
+                        &fun.value.name.value.0,
+                        wasm_encoder::ExportKind::Func,
+                        ix as u32,
+                    );
+                }
             }
         }
     }

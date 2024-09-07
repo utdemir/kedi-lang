@@ -37,6 +37,13 @@ pub fn stdlib() -> codegen::fragment::Module {
     let syntax = parser::parse(str).unwrap();
     let plain = renamer::rename(&syntax).unwrap();
     let simple = simplifier::run(&plain);
-    let fragment = codegen::run(&simple);
+    let mut fragment = codegen::run(&simple);
+    for stmt in fragment.statements.iter_mut() {
+        match stmt {
+            codegen::fragment::TopLevelStmt::FunDecl(fun) => {
+                fun.value.export = false;
+            }
+        }
+    }
     fragment
 }

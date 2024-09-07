@@ -34,6 +34,9 @@ cargo xtask test
 
 # Build the compiler-web project and put it to appropriate location on `website` project
 cargo xtask build-compiler-web-artifacts
+
+# Given a wasm file, optimise with wasm-opt to compare
+wasm2wat out.wasm > out.wat && wasm-opt out.wasm -o opt.wasm -O && wasm2wat opt.wasm > opt.wat
 ```
 
 </details>

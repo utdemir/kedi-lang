@@ -6,12 +6,14 @@ import { STYLE_VARS } from "src/utils/style_vars";
 import { run_wasm } from "src/utils/run_wasm";
 import { base64 } from "rfc4648";
 
+import example_fibonacci from '../../../compiler/tests/data/examples/fibonacci.kedi?raw';
+
 await kedi_lang_web.default();
 
 const EMPTY_COMPILE_RESULT: kedi_lang_web.CompileResultWeb = kedi_lang_web.runner("") as kedi_lang_web.CompileResultWeb;
 
 export function KediIde() {
-    const [source, setSource] = createSignal(INITIAL);
+    const [source, setSource] = createSignal(example_fibonacci);
     const [result, setResult] = createSignal<kedi_lang_web.CompileResultWeb>(EMPTY_COMPILE_RESULT);
 
     const possibleInternalType = [
@@ -127,14 +129,6 @@ const styles: Record<string, JSX.CSSProperties> = {
         height: '100%',
     },
 }
-
-const INITIAL = `
-fn greater_than(left: Number, right: Number): Number {
-    let ret = 99;
-    %wasm [left, right] [ret] i32.gt_s;
-    return ret; 
-}
-`.trim();
 
 function s_success<K>(
     value: Accessor<kedi_lang_web.CompileResultWeb>,

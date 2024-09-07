@@ -17,6 +17,7 @@ pub fn run(input: &simple::Module) -> fragment::Module {
                 let f = fun.map(|fun| {
                     return fragment::FunDecl {
                         name: fun.name.clone(),
+                        export: true,
                         implementation,
                         refs: fun.refs.clone(),
                     };

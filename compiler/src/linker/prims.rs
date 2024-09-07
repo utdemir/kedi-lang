@@ -21,6 +21,7 @@ pub fn prims() -> fragment::Module {
 fn mk_prim(name: &str, params: Vec<ValType>, body: Vec<fragment::Instr>) -> fragment::TopLevelStmt {
     fragment::TopLevelStmt::FunDecl(WithLoc::unknown(fragment::FunDecl {
         name: WithLoc::unknown(syntax::Ident(format!("__prim_{}", name))),
+        export: false,
         implementation: WithLoc::unknown(fragment::FunImpl { params, body }),
         refs: HashMap::new(),
     }))

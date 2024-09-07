@@ -83,6 +83,18 @@ impl<T: SExpr> SExpr for Vec<T> {
     }
 }
 
+impl SExpr for () {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::List(vec![])
+    }
+}
+
+impl SExpr for bool {
+    fn to_sexpr(&self) -> SExprTerm {
+        SExprTerm::Symbol(if *self { "true" } else { "false" }.to_string())
+    }
+}
+
 impl SExpr for i32 {
     fn to_sexpr(&self) -> SExprTerm {
         SExprTerm::number(*self)
