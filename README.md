@@ -6,6 +6,7 @@
 - [x] i32
 - [x] variables
 - [x] conditionals & loops
+- [x] online playground
 - [ ] other stack types
 - [ ] structs 
 - [ ] arrays
