@@ -1,5 +1,6 @@
 use crate::mk_tests;
 use crate::util;
+use crate::util::ExecuteWasmResult;
 
 mk_tests! {
     id: assert_example("id", "id", &[42], 42),
@@ -16,11 +17,29 @@ mk_tests! {
     fibonacci_5: assert_example("fibonacci", "fibonacci", &[5], 5),
     fibonacci_6: assert_example("fibonacci", "fibonacci", &[6], 8),
     fibonacci_7: assert_example("fibonacci", "fibonacci", &[7], 13),
+
+    infinite_loop: assert_example_result("infinite_loop", "infinite_loop", &[],
+        ExecuteWasmResult::Timeout(),
+    ),
 }
 
 //
 
 fn assert_example(example_name: &str, entrypoint: &str, params: &[i32], expected: i32) {
+    assert_example_result(
+        example_name,
+        entrypoint,
+        params,
+        ExecuteWasmResult::Ok(expected),
+    );
+}
+
+fn assert_example_result(
+    example_name: &str,
+    entrypoint: &str,
+    params: &[i32],
+    expected: ExecuteWasmResult,
+) {
     let mut d = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     d.push("tests/data/examples");
     d.push(format!("{}.kedi", example_name));
@@ -29,5 +48,9 @@ fn assert_example(example_name: &str, entrypoint: &str, params: &[i32], expected
     let out = kedi_lang::runner::runner(&src).unwrap();
     let result = util::execute_wasm(&out.wasm.bytes, entrypoint, params);
 
-    assert_eq!(result, expected, "expected {} but got {}", expected, result);
+    assert_eq!(
+        result, expected,
+        "expected {:?} but got {:?}",
+        expected, result
+    );
 }

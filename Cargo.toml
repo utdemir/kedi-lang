@@ -5,6 +5,7 @@ members = [
     "compiler",
     "compiler_web",
     "xtask", 
+    "wasm_exec",
 ]
 
 [workspace.metadata.bin]

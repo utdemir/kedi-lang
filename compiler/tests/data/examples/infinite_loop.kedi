@@ -1,0 +1,6 @@
+fn infinite_loop {
+    while 1 {
+    }
+
+    return 1;
+}

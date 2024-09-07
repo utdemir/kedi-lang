@@ -8,6 +8,7 @@ mk_tests! {
     id_with_unused_var: test("id_with_unused_var"),
     two_funs: test("two_funs"),
     if_: test("if"),
+    infinite_loop: test("infinite_loop"),
 }
 
 fn test(example_name: &str) {
