@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use wasm_encoder;
 
-use super::fragment;
+use super::{fragment, rts::object_val_type};
 use crate::{renamer::plain, simplifier::simple};
 
 pub fn run(input: &simple::Module) -> fragment::Module {
@@ -46,7 +46,7 @@ fn codegen_function(input: &simple::FunImpl) -> fragment::FunImpl {
     let locals: Vec<(u32, wasm_encoder::ValType)> = state
         .locals
         .values()
-        .map(|x| (*x, wasm_encoder::ValType::I32))
+        .map(|x| (*x, object_val_type()))
         .collect();
 
     return fragment::FunImpl {
@@ -54,7 +54,7 @@ fn codegen_function(input: &simple::FunImpl) -> fragment::FunImpl {
             .parameters
             .value
             .iter()
-            .map(|x| wasm_encoder::ValType::I32)
+            .map(|x| object_val_type())
             .collect(),
         body: instructions,
     };
@@ -184,12 +184,12 @@ struct CodegenState {
 
 impl CodegenState {
     fn new() -> Self {
-        return CodegenState {
+        CodegenState {
             params: HashMap::new(),
             locals: HashMap::new(),
             single_uses: HashMap::new(),
             depth_to_loop: vec![],
-        };
+        }
     }
 
     fn register_param(&mut self, param: &plain::LocalIdent) {
