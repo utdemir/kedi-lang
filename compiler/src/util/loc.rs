@@ -1,61 +1,33 @@
+use sexpr::SExpr;
+use sexpr_derive::SExpr;
 use std::collections::HashMap;
 
-use crate::util::pp::{SExpr, SExprTerm};
+use super::ax::{ax, Ax};
 
 // Location
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct WithLoc<T> {
-    pub value: T,
-    pub location: SrcLoc,
-}
+pub type WithLoc<T> = Ax<SrcLoc, T>;
 
 pub type LVec<T> = WithLoc<Vec<T>>;
 
-impl<T: SExpr> SExpr for WithLoc<T> {
-    fn to_sexpr(&self) -> SExprTerm {
-        self.value.to_sexpr()
+impl<T: sexpr::SExpr> sexpr::SExpr for WithLoc<T> {
+    fn to_sexpr(&self) -> sexpr::SExprTerm {
+        self.v.to_sexpr()
     }
 }
 
 impl<T> WithLoc<T> {
     pub fn known(value: T, location: Span) -> WithLoc<T> {
-        WithLoc {
-            value,
-            location: SrcLoc::Known(location),
-        }
+        ax(SrcLoc::Known(location), value)
     }
 
     pub fn unknown(value: T) -> WithLoc<T> {
-        WithLoc {
-            value,
-            location: SrcLoc::Unknown,
-        }
-    }
-
-    pub fn map<U, F: FnOnce(&T) -> U>(&self, f: F) -> WithLoc<U> {
-        WithLoc {
-            value: f(&self.value),
-            location: self.location,
-        }
+        ax(SrcLoc::Unknown, value)
     }
 
     pub fn to_tagged(self, tag_map: &mut TagMap) -> WithTag<T> {
-        let tag = tag_map.get_tag(self.location);
-        WithTag {
-            value: self.value,
-            tag,
-        }
-    }
-
-    pub fn map_result<U, E, F: FnOnce(&T) -> Result<U, E>>(&self, f: F) -> Result<WithLoc<U>, E> {
-        match f(&self.value) {
-            Ok(value) => Ok(WithLoc {
-                value,
-                location: self.location,
-            }),
-            Err(err) => Err(err),
-        }
+        let tag = tag_map.get_tag(self.a);
+        ax(tag, self.v)
     }
 }
 
@@ -65,25 +37,12 @@ pub trait Located {
 
 impl<T> Located for WithLoc<T> {
     fn location(&self) -> SrcLoc {
-        self.location
+        self.a
     }
 }
 
-pub fn lost<T>(value: T) -> WithLoc<T> {
-    WithLoc {
-        value,
-        location: SrcLoc::Unknown,
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, SExpr)]
 pub struct Offset(pub usize);
-
-impl SExpr for Offset {
-    fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::call("pos", &[SExprTerm::Number(self.0 as i64)])
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Span {
@@ -91,11 +50,11 @@ pub struct Span {
     pub length: usize,
 }
 
-impl SExpr for Span {
-    fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::call(
+impl sexpr::SExpr for Span {
+    fn to_sexpr(&self) -> sexpr::SExprTerm {
+        sexpr::call(
             "span",
-            &[self.start.to_sexpr(), SExprTerm::Number(self.length as i64)],
+            &[self.start.to_sexpr(), sexpr::number(self.length as i64)],
         )
     }
 }
@@ -137,7 +96,7 @@ impl Span {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, SExpr)]
 pub enum SrcLoc {
     Known(Span),
     Unknown,
@@ -145,10 +104,7 @@ pub enum SrcLoc {
 
 impl SrcLoc {
     pub fn attach<T>(&self, value: T) -> WithLoc<T> {
-        WithLoc {
-            value,
-            location: *self,
-        }
+        ax(*self, value)
     }
 
     pub fn enclosing(fst: &SrcLoc, snd: &SrcLoc) -> SrcLoc {
@@ -177,36 +133,17 @@ pub struct Tag {
     pub value: u32,
 }
 
-impl SExpr for Tag {
-    fn to_sexpr(&self) -> SExprTerm {
-        SExprTerm::call("tag", &[SExprTerm::Number(self.value as i64)])
+impl sexpr::SExpr for Tag {
+    fn to_sexpr(&self) -> sexpr::SExprTerm {
+        sexpr::call("tag", &[sexpr::number(self.value)])
     }
 }
 
-impl Tag {
-    pub fn attach<T>(&self, value: T) -> WithTag<T> {
-        WithTag { value, tag: *self }
-    }
-}
+type WithTag<T> = Ax<Tag, T>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct WithTag<T> {
-    pub value: T,
-    pub tag: Tag,
-}
-
-impl<T: SExpr> SExpr for WithTag<T> {
-    fn to_sexpr(&self) -> SExprTerm {
-        self.value.to_sexpr()
-    }
-}
-
-impl<T> WithTag<T> {
-    pub fn map<U, F: FnOnce(&T) -> U>(&self, f: F) -> WithTag<U> {
-        WithTag {
-            value: f(&self.value),
-            tag: self.tag,
-        }
+impl<T: sexpr::SExpr> sexpr::SExpr for WithTag<T> {
+    fn to_sexpr(&self) -> sexpr::SExprTerm {
+        self.v.to_sexpr()
     }
 }
 
@@ -216,7 +153,7 @@ pub trait Tagged {
 
 impl<T> Tagged for WithTag<T> {
     fn tag(&self) -> Tag {
-        self.tag
+        self.a
     }
 }
 
@@ -224,6 +161,18 @@ impl<T> Tagged for WithTag<T> {
 pub struct TagMap {
     next_tag: u32,
     map: HashMap<Tag, SrcLoc>,
+}
+
+impl SExpr for TagMap {
+    fn to_sexpr(&self) -> sexpr::SExprTerm {
+        sexpr::call("tag-map", &[self.map.to_sexpr()])
+    }
+}
+
+impl Default for TagMap {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TagMap {
@@ -252,4 +201,21 @@ impl TagMap {
     }
 }
 
-// Synonyms
+pub trait LocLike: Clone + std::fmt::Debug {
+    fn enclosing(fst: &Self, snd: &Self) -> Self;
+}
+
+impl LocLike for SrcLoc {
+    fn enclosing(fst: &Self, snd: &Self) -> Self {
+        SrcLoc::enclosing(fst, snd)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NoLoc;
+
+impl LocLike for NoLoc {
+    fn enclosing(_: &Self, _: &Self) -> Self {
+        NoLoc
+    }
+}

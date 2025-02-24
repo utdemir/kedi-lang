@@ -2,9 +2,11 @@
 
 use crate::parser::error::*;
 use crate::parser::syntax;
+use crate::phase::TransformPhase;
 use crate::util::loc::Span;
+use crate::util::loc::SrcLoc;
 
-pub fn parse(input: &str) -> Result<syntax::Module, Error> {
+pub fn parse(input: &str) -> Result<syntax::Module<SrcLoc>, Error> {
     let parser = crate::parser::grammar::ModuleParser::new();
     match parser.parse(input) {
         Ok(module) => Ok(module),

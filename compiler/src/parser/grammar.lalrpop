@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use super::syntax::*;
-use crate::util::loc::{WithLoc, Span};
+use crate::util::loc::{WithLoc, Span, SrcLoc};
 
 grammar;
 
@@ -15,7 +15,7 @@ WithSemi<T>: T = {
 };
 
 pub Ident: Ident = {
-    <s:r"@?[a-zA-Z_][a-zA-Z0-9_]*\??"> => Ident(s.to_string()),
+    <s:r"[a-zA-Z_][a-zA-Z0-9_]*\??"> => Ident(s.to_string()),
 };
 
 pub LitNum: LitNum = {
@@ -26,7 +26,7 @@ pub LitStr: LitStr = {
     <s:r#""[^"]*""#> => LitStr(s[1..s.len()-1].to_string()),
 };
 
-pub FunCall: FunCall = {
+pub FunCall: FunCall<SrcLoc> = {
     <name:L<Ident>> <args: L< <arg:SimpleExpr+> >> => FunCall { name, args },
 };
 
@@ -34,25 +34,25 @@ Semi: () = {
     ";" => (),
 };
 
-pub SimpleExpr: Expr = {
+pub SimpleExpr: Expr<SrcLoc> = {
     <n:L<LitNum>> => Expr::LitNum(n),
     <s:L<LitStr>> => Expr::LitStr(s),
     <i:L<Ident>> => Expr::Ident(i),
     "(" <e:Expr> ")" => e,
 };
 
-pub Expr: Expr = {
+pub Expr: Expr<SrcLoc> = {
     <e:SimpleExpr> => e,
     <f:FunCall> => Expr::FunCall(f),
 };
 
 // Statements
 
-pub TopLevelStmt: TopLevelStmt = {
+pub TopLevelStmt: TopLevelStmt<SrcLoc> = {
     <f: L<FunDef>> => TopLevelStmt::FunDef(f),
 };
 
-pub FunDef: FunDef = {
+pub FunDef: FunDef<SrcLoc> = {
     "fn" 
         <name:L<Ident>> 
         <params: L< <p:L<Ident>*> >>
@@ -60,15 +60,15 @@ pub FunDef: FunDef = {
         <body: L<Block>> => FunDef { name, params, preds, body },
 };
 
-Pred: Expr = {
+Pred: Expr<SrcLoc> = {
     ":" <pred:Expr> => pred,
 };
 
-Block: Vec<FunStmt> = {
+Block: Vec<FunStmt<SrcLoc>> = {
     "{" <stmts: FunStmt* > "}" => stmts,
 };
 
-pub FunStmt: FunStmt = {
+pub FunStmt: FunStmt<SrcLoc> = {
     <stmt:L<WithSemi<Return>>> => FunStmt::Return(stmt),
     <stmt:L<WithSemi<Assignment>>> => FunStmt::Assignment(stmt),
     <stmt:L<WithSemi<LetDecl>>> => FunStmt::LetDecl(stmt),
@@ -76,35 +76,35 @@ pub FunStmt: FunStmt = {
     <stmt:L<If>> => FunStmt::If(stmt),
 };
 
-pub Return: Return = {
+pub Return: Return<SrcLoc> = {
     "return" <e:Expr> => Return(e),
 };
 
-pub Assignment: Assignment = {
+pub Assignment: Assignment<SrcLoc> = {
     <name:L<Ident>> "=" <value:Expr> => Assignment { name, value },
 };
 
-pub LetDecl : LetDecl = {
+pub LetDecl : LetDecl<SrcLoc> = {
     "let" <name:L<Ident>> "=" <value:Expr> => LetDecl { name, value },
 };
 
-pub While: While = {
+pub While: While<SrcLoc> = {
     "while" <condition:Expr> <body:L<Block>> => While { condition, body },
 };
 
-pub If: If = {
+pub If: If<SrcLoc> = {
     <bare:IfBare> => bare,
     <full:IfFull> => full,
 };
 
-pub IfBare: If = {
+pub IfBare: If<SrcLoc> = {
     "if" <condition:Expr> <then:L<Block>> => If { condition, then, else_: None },
 };
 
-pub IfFull: If = {
+pub IfFull: If<SrcLoc> = {
     "if" <condition:Expr> <then:L<Block>> "else" <else_:L<Block>> => If { condition, then, else_: Some(else_) },
 };
 
-pub Module: Module = {
+pub Module: Module<SrcLoc> = {
     <stmts: L< <arg:TopLevelStmt*> >> => Module { statements: stmts },
 };

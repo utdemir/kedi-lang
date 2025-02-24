@@ -51,7 +51,7 @@ type CompileResultWeb =
 
 #[wasm_bindgen]
 pub fn runner(source: &str) -> JsValue {
-    let runner = kedi_lang::runner::runner(source);
+    let runner = kedi_lang::runner::runner(source, Default::default());
 
     match runner {
         Ok(result) => {

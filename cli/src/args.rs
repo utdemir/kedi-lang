@@ -1,6 +1,4 @@
-use clap;
 use clap::Parser as _;
-use patharg;
 
 #[derive(clap::Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -12,6 +10,7 @@ pub struct Args {
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
     Compile(CompileArgs),
+    Run(RunArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -33,6 +32,17 @@ pub struct CompileArgs {
     pub out_linked: Option<patharg::OutputArg>,
     #[arg(long)]
     pub out_wat: Option<patharg::OutputArg>,
+}
+
+#[derive(clap::Args, Debug)]
+pub struct RunArgs {
+    pub entry: patharg::InputArg,
+
+    #[arg(long)]
+    pub export: Option<String>,
+
+    #[arg(long)]
+    pub parameters: Option<Vec<i32>>,
 }
 
 pub fn run() -> Args {

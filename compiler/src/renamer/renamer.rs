@@ -1,184 +1,238 @@
 use bimap::BiHashMap;
 use std::collections::HashMap;
+use std::fmt::Debug;
 
+use super::error::{DuplicateIdentifierError, Error, IdentifierNotFoundError};
+use super::plain::Return;
 use crate::parser::syntax;
 use crate::renamer::plain;
-use crate::util::loc::SrcLoc;
+use crate::util::ax::{ax, Ax};
+use crate::util::loc::LocLike;
 
-use super::plain::Return;
-
-pub fn rename(input: &syntax::Module) -> Result<plain::Module, Error> {
+pub fn rename<L: LocLike + Debug>(input: &syntax::Module<L>) -> Result<plain::Module<L>, Error<L>> {
     let mut ret = vec![];
 
-    for syn_input in input.statements.value.iter() {
-        let input = rename_statement(&syn_input)?;
+    for syn_input in input.statements.v.iter() {
+        let input = rename_statement(syn_input)?;
         ret.push(input);
     }
 
     Ok(plain::Module { statements: ret })
 }
 
-fn rename_statement(input: &syntax::TopLevelStmt) -> Result<plain::TopLevelStmt, Error> {
+fn rename_statement<L: LocLike + Debug>(
+    input: &syntax::TopLevelStmt<L>,
+) -> Result<plain::TopLevelStmt<L>, Error<L>> {
     match input {
         syntax::TopLevelStmt::FunDef(fun) => {
-            let fun = fun.map_result(|fun| rename_function(fun))?;
-            Ok(plain::TopLevelStmt::FunDef(fun))
+            let fun = fun.as_ref().map(|f| rename_function(&f)).transpose()?;
+            Ok(plain::TopLevelStmt::FunDef(fun.clone_a()))
         }
     }
 }
 
-fn rename_function(input: &syntax::FunDef) -> Result<plain::FunDef, Error> {
+fn rename_function<L: LocLike + Debug>(
+    input: &syntax::FunDef<L>,
+) -> Result<plain::FunDef<L>, Error<L>> {
     let mut env = RenamerEnv::new();
 
-    let params = input.params.map_result::<_, Error, _>(|ps| {
-        ps.iter()
-            .map(|p| {
-                let pid = env.mk_new_local(p)?;
-                // let predicate = p.predicate.map(|p| rename_expr(&mut env, &p));
-                Ok(pid)
-            })
-            .collect()
-    })?;
+    let params = input
+        .params
+        .as_ref()
+        .map(|ps| {
+            ps.iter()
+                .map(|p| {
+                    let pid = env.mk_new_local(p)?;
+                    // let predicate = p.predicate.map(|p| rename_expr(&mut env, &p));
+                    Ok::<_, Error<_>>(pid)
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?
+        .clone_a();
 
-    let body = input.body.map_result(|body| {
-        body.iter()
-            .map(|stmt| rename_fun_statement(&mut env, &stmt))
-            .collect()
-    })?;
-
-    let impl_loc = SrcLoc::enclosing(&params.location, &body.location);
+    let body = input
+        .body
+        .as_ref()
+        .map(|body| {
+            body.iter()
+                .map(|stmt| rename_fun_statement(&mut env, stmt))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?
+        .clone_a();
 
     return Ok(plain::FunDef {
         name: input.name.clone(),
-        implementation: impl_loc.attach(plain::FunImpl {
+        implementation: plain::FunImpl {
             params,
             body,
-            preds: input.preds.map(|_x| vec![]),
-        }),
-        refs: env
-            .globals
-            .iter()
-            .map(|(k, v)| (v.clone(), k.clone()))
-            .collect(),
+            preds: ax(input.preds.a.clone(), vec![]),
+        },
+        refs: env.globals.iter().map(|(k, v)| (*v, k.clone())).collect(),
     });
 }
 
-fn rename_fun_statement(
-    env: &mut RenamerEnv,
-    input: &syntax::FunStmt,
-) -> Result<plain::FunStmt, Error> {
+fn rename_fun_statement<L: LocLike + Debug>(
+    env: &mut RenamerEnv<L>,
+    input: &syntax::FunStmt<L>,
+) -> Result<plain::FunStmt<L>, Error<L>> {
     match input {
         syntax::FunStmt::LetDecl(decl) => {
-            let ret = decl.map_result(|decl| {
-                let pid = env.mk_new_local(&decl.name)?;
-                let expr = rename_expr(env, &decl.value);
-                Ok::<_, Error>(plain::LetDecl {
-                    name: pid,
-                    value: expr,
+            let ret = decl
+                .as_ref()
+                .clone_a()
+                .map(|decl| {
+                    let pid = env.mk_new_local(&decl.name)?;
+                    let expr = rename_expr(env, &decl.value);
+                    Ok::<_, Error<_>>(plain::LetDecl {
+                        name: pid,
+                        value: expr,
+                    })
                 })
-            })?;
+                .transpose()?;
 
             Ok(plain::FunStmt::LetDecl(ret))
         }
 
         syntax::FunStmt::Return(ret) => {
-            let ret = ret.map(|ret| Return(rename_expr(env, &ret.0)));
+            let ret = ret
+                .as_ref()
+                .clone_a()
+                .map(|ret| Return(rename_expr(env, &ret.0)));
             Ok(plain::FunStmt::Return(ret))
         }
 
         syntax::FunStmt::While(while_stmt) => {
-            let ret = while_stmt.map_result(|while_stmt| {
-                let condition = rename_expr(env, &while_stmt.condition);
-                let body = while_stmt.body.map_result(|body| {
-                    body.into_iter()
-                        .map(|stmt| rename_fun_statement(env, &stmt))
-                        .collect::<Result<Vec<_>, _>>()
-                })?;
-                Ok::<_, Error>(plain::While { condition, body })
-            })?;
+            let ret = while_stmt
+                .as_ref()
+                .map(|while_stmt| {
+                    let condition = rename_expr(env, &while_stmt.condition);
+                    let body = while_stmt
+                        .body
+                        .as_ref()
+                        .map(|body| {
+                            body.iter()
+                                .map(|stmt| rename_fun_statement(env, stmt))
+                                .collect::<Result<Vec<_>, _>>()
+                        })
+                        .transpose()?
+                        .clone_a();
+                    Ok::<_, Error<_>>(plain::While { condition, body })
+                })
+                .transpose()?
+                .clone_a();
 
             Ok(plain::FunStmt::While(ret))
         }
 
         syntax::FunStmt::Assignment(assignment) => {
-            let ret = assignment.map_result(|assignment| {
-                let id = assignment
-                    .name
-                    .map_result(|lhs| match env.resolve_local(&lhs) {
-                        Some(x) => Ok(x),
-                        None => Err(IdentifierNotFoundError {
-                            identifier: assignment.name.clone(),
-                        }),
-                    })?;
-                let value = rename_expr(env, &assignment.value);
-                Ok::<_, Error>(plain::Assignment { id, value })
-            })?;
+            let ret = assignment
+                .as_ref()
+                .map(|assignment| {
+                    let id = assignment
+                        .name
+                        .as_ref()
+                        .map(|lhs| match env.resolve_local(&lhs) {
+                            Some(x) => Ok(x),
+                            None => Err(IdentifierNotFoundError {
+                                identifier: assignment.name.clone(),
+                            }),
+                        })
+                        .transpose()?
+                        .clone_a();
+                    let value = rename_expr(env, &assignment.value);
+                    Ok::<_, Error<_>>(plain::Assignment { id, value })
+                })
+                .transpose()?
+                .clone_a();
 
             Ok(plain::FunStmt::Assignment(ret))
         }
 
         syntax::FunStmt::If(if_stmt) => {
-            let ret = if_stmt.map_result(|if_stmt| {
-                let condition = rename_expr(env, &if_stmt.condition);
-                let then = if_stmt.then.map_result(|then| {
-                    then.into_iter()
-                        .map(|stmt| rename_fun_statement(env, &stmt))
-                        .collect::<Result<Vec<_>, _>>()
-                })?;
-                let else_ = if_stmt
-                    .else_
-                    .as_ref()
-                    .map(|else_| {
-                        else_.map_result(|else_| {
-                            else_
-                                .into_iter()
-                                .map(|stmt| rename_fun_statement(env, &stmt))
+            let ret = if_stmt
+                .as_ref()
+                .map(|if_stmt| {
+                    let condition = rename_expr(env, &if_stmt.condition);
+                    let then = if_stmt
+                        .then
+                        .as_ref()
+                        .map(|then| {
+                            then.iter()
+                                .map(|stmt| rename_fun_statement(env, stmt))
                                 .collect::<Result<Vec<_>, _>>()
                         })
+                        .transpose()?
+                        .clone_a();
+                    let else_ = if_stmt
+                        .else_
+                        .as_ref()
+                        .map(|else_| {
+                            else_
+                                .as_ref()
+                                .clone_a()
+                                .map(|else_| {
+                                    else_
+                                        .iter()
+                                        .map(|stmt| rename_fun_statement(env, stmt))
+                                        .collect::<Result<Vec<_>, _>>()
+                                })
+                                .transpose()
+                        })
+                        .transpose()?;
+                    Ok::<_, Error<_>>(plain::If {
+                        condition,
+                        then,
+                        else_,
                     })
-                    .transpose()?;
-                Ok::<_, Error>(plain::If {
-                    condition,
-                    then,
-                    else_,
                 })
-            })?;
+                .transpose()?;
 
-            Ok(plain::FunStmt::If(ret))
+            Ok(plain::FunStmt::If(ret.clone_a()))
         }
 
         otherwise => unimplemented!("{:?}", otherwise),
     }
 }
 
-fn rename_expr(env: &mut RenamerEnv, input: &syntax::Expr) -> plain::Expr {
+fn rename_expr<L: LocLike + Debug>(
+    env: &mut RenamerEnv<L>,
+    input: &syntax::Expr<L>,
+) -> plain::Expr<L> {
     match input {
         syntax::Expr::LitNum(x) => plain::Expr::LitNum(x.clone()),
         syntax::Expr::LitStr(x) => plain::Expr::LitStr(x.clone()),
-        syntax::Expr::Ident(x) => plain::Expr::Ident(env.resolve(&x)),
+        syntax::Expr::Ident(x) => plain::Expr::Ident(env.resolve(x)),
         syntax::Expr::FunCall(x) => plain::Expr::FunCall(rename_fun_call(env, x)),
     }
 }
 
-fn rename_fun_call(env: &mut RenamerEnv, input: &syntax::FunCall) -> plain::FunCall {
-    let name = input.name.map(|x| env.get_global(x));
+fn rename_fun_call<L: LocLike + Debug>(
+    env: &mut RenamerEnv<L>,
+    input: &syntax::FunCall<L>,
+) -> plain::FunCall<L> {
+    let name = input.name.as_ref().map(|x| env.get_global(x)).clone_a();
     let args = input
         .args
-        .map(|x| x.iter().map(|x| rename_expr(env, x)).collect());
+        .as_ref()
+        .map(|x| x.iter().map(|x| rename_expr(env, x)).collect::<Vec<_>>())
+        .clone_a();
     plain::FunCall { name, args }
 }
 
-struct RenamerEnv {
+struct RenamerEnv<L> {
     next_local_id: u32,
     next_global_id: u32,
 
     locals: BiHashMap<syntax::Ident, plain::LocalIdent>,
-    globals: BiHashMap<syntax::Ident, plain::GlobalIdent>,
+    globals: BiHashMap<syntax::Ident, plain::UnresolvedIdent>,
 
-    local_locs: HashMap<syntax::Ident, SrcLoc>,
+    local_locs: HashMap<syntax::Ident, L>,
+    _marker: std::marker::PhantomData<L>,
 }
 
-impl RenamerEnv {
+impl<L: LocLike + Debug> RenamerEnv<L> {
     fn new() -> Self {
         RenamerEnv {
             next_local_id: 0,
@@ -187,78 +241,50 @@ impl RenamerEnv {
             globals: BiHashMap::new(),
 
             local_locs: HashMap::new(),
+            _marker: std::marker::PhantomData,
         }
     }
 
     fn mk_new_local(
         &mut self,
-        input: &syntax::LIdent,
-    ) -> Result<plain::LLocalIdent, DuplicateIdentifierError> {
-        if let Some(_) = self.locals.get_by_left(&input.value) {
+        input: &Ax<L, syntax::Ident>,
+    ) -> Result<Ax<L, plain::LocalIdent>, DuplicateIdentifierError<L>> {
+        if self.locals.get_by_left(&input.v).is_some() {
             return Err(DuplicateIdentifierError {
                 error: input.clone(),
-                original_loc: self.local_locs.get(&input.value).unwrap().clone(),
+                original_loc: self.local_locs.get(&input.v).unwrap().clone(),
             });
         }
 
         let id = self.next_local_id;
         self.next_local_id += 1;
         let pid = plain::LocalIdent { id };
-        self.locals.insert(input.value.clone(), pid.clone());
-        self.local_locs.insert(input.value.clone(), input.location);
-        Ok(input.location.attach(pid))
+        self.locals.insert(input.v.clone(), pid);
+        self.local_locs.insert(input.v.clone(), input.a.clone());
+        Ok(ax(input.a.clone(), pid))
     }
 
-    fn get_global(&mut self, input: &syntax::Ident) -> plain::GlobalIdent {
+    fn get_global(&mut self, input: &syntax::Ident) -> plain::UnresolvedIdent {
         match self.globals.get_by_left(input) {
-            Some(x) => x.clone(),
+            Some(x) => *x,
             None => {
                 let id = self.next_global_id;
                 self.next_global_id += 1;
-                let pid = plain::GlobalIdent { id };
-                self.globals.insert(input.clone(), pid.clone());
+                let pid = plain::UnresolvedIdent { id };
+                self.globals.insert(input.clone(), pid);
                 pid
             }
         }
     }
 
     fn resolve_local(&self, input: &syntax::Ident) -> Option<plain::LocalIdent> {
-        self.locals.get_by_left(input).map(|x| x.clone())
+        self.locals.get_by_left(input).copied()
     }
 
-    fn resolve(&mut self, input: &syntax::LIdent) -> plain::Ident {
-        match self.resolve_local(&input.value) {
-            Some(x) => plain::Ident::Local(input.location.attach(x)),
-            None => plain::Ident::Global(input.location.attach(self.get_global(&input.value))),
+    fn resolve(&mut self, input: &Ax<L, syntax::Ident>) -> plain::Ident<L> {
+        match self.resolve_local(&input.v) {
+            Some(x) => plain::Ident::Local(ax(input.a.clone(), x)),
+            None => plain::Ident::Global(ax(input.a.clone(), self.get_global(&input.v))),
         }
-    }
-}
-
-#[derive(Debug)]
-pub enum Error {
-    IdentifierNotFound(IdentifierNotFoundError),
-    DuplicateIdentifier(DuplicateIdentifierError),
-}
-
-#[derive(Debug)]
-pub struct IdentifierNotFoundError {
-    pub identifier: syntax::LIdent,
-}
-
-impl From<DuplicateIdentifierError> for Error {
-    fn from(e: DuplicateIdentifierError) -> Self {
-        Error::DuplicateIdentifier(e)
-    }
-}
-
-#[derive(Debug)]
-pub struct DuplicateIdentifierError {
-    pub error: syntax::LIdent,
-    pub original_loc: SrcLoc,
-}
-
-impl From<IdentifierNotFoundError> for Error {
-    fn from(e: IdentifierNotFoundError) -> Self {
-        Error::IdentifierNotFound(e)
     }
 }

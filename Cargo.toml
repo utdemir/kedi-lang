@@ -3,9 +3,11 @@ resolver = "2"
 members = [ 
     "cli",
     "compiler",
-    "compiler_web",
-    "xtask", 
-    "wasm_exec",
+    # "compiler_web",
+    "xtask",
+    "yaks/sexpr",
+    "yaks/sexpr_derive", 
+    # "wasm_exec",
 ]
 
 [workspace.metadata.bin]

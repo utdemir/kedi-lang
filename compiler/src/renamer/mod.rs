@@ -1,4 +1,7 @@
 pub mod plain;
-mod renamer;
 
+mod renamer;
 pub use renamer::*;
+
+mod error;
+pub use error::*;

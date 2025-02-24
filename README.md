@@ -1,6 +1,17 @@
 # kedi-lang
 
-## Features
+## Language features
+
+- Language:
+  - Dynamically typed
+- Verification:
+  - Functions specify arguments and return invariants similar to contracts.
+  - All contracts are property-checked at build time.
+- Targets:
+  - Interpreter
+  - JavaScript
+
+## Implementation status
 
 - [x] functions
 - [x] i32
@@ -22,17 +33,14 @@
   * **renamer**: `parsed` to `plain`
     * Desugars some syntactic sugar.
     * Top-level values explicitly declare the non-local values they depend on.
+  * **binder**: `plain` to `bound`
+    * Resolves all references to their definitions.
   * **simplifier**: `plan` to `simple`
     * Simple is an untyped TAC-like language.
   * **codegen**: `simple` to `fragment`
-    * Fragment is a set of functions with bodies compiled to WASM.
-  * **linker**: `fragment` to `wasm`
-    * Links the fragments together and emits the final wasm module.
-* Frequently used utilities:
-  * **runner**: Calls the phases one after another to produce the final wasm module from source code.
-  * **error**: Sum type that aggregates all compiler errors, and a pretty printer.
-  * **util::loc**: Data types to track source locations.
-  * **util::pp**: Utilities to pretty-print intermediate representations.
+    * Takes simple and generates an output.
+  * **interpret**: `simple` to `Value`
+    * Takes simple and interprets it. Useful for testing.
 
 ## Hacking
 

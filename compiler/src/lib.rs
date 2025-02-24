@@ -1,10 +1,9 @@
-pub mod codegen;
+#![feature(try_trait_v2)]
+
 pub mod error;
-pub mod linker;
 pub mod parser;
+pub mod phase;
 pub mod renamer;
-pub mod runner;
-pub mod simplifier;
 pub mod util;
 
 mod scratchpad;

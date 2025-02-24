@@ -47,7 +47,7 @@ fn main() {
 
             let mut command = std::process::Command::new(bin_path);
             command
-                .args(&[
+                .args([
                     "build",
                     "--target",
                     "web",
