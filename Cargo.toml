@@ -6,7 +6,7 @@ members = [
     # "compiler_web",
     "xtask",
     "yaks/sexpr",
-    "yaks/sexpr_derive", 
+    "yaks/sexpr_derive",
     # "wasm_exec",
 ]
 

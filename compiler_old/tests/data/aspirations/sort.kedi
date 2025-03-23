@@ -1,8 +1,10 @@
 fn sort arr
-    : array? arr
+    : array_of? arr
     : arr.all? number?
-    : sorted? @return
+    : sorted? result
+    : @return
 {
+    let mut arr = arr.clone();
     for i in range(0, arr.length) {
         for j in range(i+1, arr.length) {
             if arr[i] > arr[j] {

@@ -211,11 +211,8 @@ impl LocLike for SrcLoc {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct NoLoc;
-
-impl LocLike for NoLoc {
+impl LocLike for () {
     fn enclosing(_: &Self, _: &Self) -> Self {
-        NoLoc
+        ()
     }
 }

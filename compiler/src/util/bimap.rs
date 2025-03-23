@@ -2,7 +2,7 @@ use bimap::BiHashMap;
 use sexpr::SExpr;
 use std::iter::FromIterator;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bimap<K, V>
 where
     K: Eq + std::hash::Hash,

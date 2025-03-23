@@ -9,7 +9,9 @@ use crate::renamer::plain;
 use crate::util::ax::{ax, Ax};
 use crate::util::loc::LocLike;
 
-pub fn rename<L: LocLike + Debug>(input: &syntax::Module<L>) -> Result<plain::Module<L>, Error<L>> {
+pub fn rename<LocTy: LocLike + Debug>(
+    input: &syntax::Module<LocTy>,
+) -> Result<plain::Module<LocTy, plain::Ident<LocTy>>, Error<LocTy>> {
     let mut ret = vec![];
 
     for syn_input in input.statements.v.iter() {
@@ -20,9 +22,9 @@ pub fn rename<L: LocLike + Debug>(input: &syntax::Module<L>) -> Result<plain::Mo
     Ok(plain::Module { statements: ret })
 }
 
-fn rename_statement<L: LocLike + Debug>(
-    input: &syntax::TopLevelStmt<L>,
-) -> Result<plain::TopLevelStmt<L>, Error<L>> {
+fn rename_statement<LocTy: LocLike + Debug>(
+    input: &syntax::TopLevelStmt<LocTy>,
+) -> Result<plain::TopLevelStmt<LocTy, plain::Ident<LocTy>>, Error<LocTy>> {
     match input {
         syntax::TopLevelStmt::FunDef(fun) => {
             let fun = fun.as_ref().map(|f| rename_function(&f)).transpose()?;
@@ -31,9 +33,9 @@ fn rename_statement<L: LocLike + Debug>(
     }
 }
 
-fn rename_function<L: LocLike + Debug>(
-    input: &syntax::FunDef<L>,
-) -> Result<plain::FunDef<L>, Error<L>> {
+fn rename_function<LocTy: LocLike + Debug>(
+    input: &syntax::FunDef<LocTy>,
+) -> Result<plain::FunDef<LocTy, plain::Ident<LocTy>>, Error<LocTy>> {
     let mut env = RenamerEnv::new();
 
     let params = input
@@ -73,10 +75,10 @@ fn rename_function<L: LocLike + Debug>(
     });
 }
 
-fn rename_fun_statement<L: LocLike + Debug>(
-    env: &mut RenamerEnv<L>,
-    input: &syntax::FunStmt<L>,
-) -> Result<plain::FunStmt<L>, Error<L>> {
+fn rename_fun_statement<LocTy: LocLike + Debug>(
+    env: &mut RenamerEnv<LocTy>,
+    input: &syntax::FunStmt<LocTy>,
+) -> Result<plain::FunStmt<LocTy, plain::Ident<LocTy>>, Error<LocTy>> {
     match input {
         syntax::FunStmt::LetDecl(decl) => {
             let ret = decl
@@ -196,10 +198,10 @@ fn rename_fun_statement<L: LocLike + Debug>(
     }
 }
 
-fn rename_expr<L: LocLike + Debug>(
-    env: &mut RenamerEnv<L>,
-    input: &syntax::Expr<L>,
-) -> plain::Expr<L> {
+fn rename_expr<LocTy: LocLike + Debug>(
+    env: &mut RenamerEnv<LocTy>,
+    input: &syntax::Expr<LocTy>,
+) -> plain::Expr<LocTy, plain::Ident<LocTy>> {
     match input {
         syntax::Expr::LitNum(x) => plain::Expr::LitNum(x.clone()),
         syntax::Expr::LitStr(x) => plain::Expr::LitStr(x.clone()),
@@ -208,10 +210,10 @@ fn rename_expr<L: LocLike + Debug>(
     }
 }
 
-fn rename_fun_call<L: LocLike + Debug>(
-    env: &mut RenamerEnv<L>,
-    input: &syntax::FunCall<L>,
-) -> plain::FunCall<L> {
+fn rename_fun_call<LocTy: LocLike + Debug>(
+    env: &mut RenamerEnv<LocTy>,
+    input: &syntax::FunCall<LocTy>,
+) -> plain::FunCall<LocTy, plain::Ident<LocTy>> {
     let name = input.name.as_ref().map(|x| env.get_global(x)).clone_a();
     let args = input
         .args
@@ -221,18 +223,18 @@ fn rename_fun_call<L: LocLike + Debug>(
     plain::FunCall { name, args }
 }
 
-struct RenamerEnv<L> {
+struct RenamerEnv<LocTy> {
     next_local_id: u32,
     next_global_id: u32,
 
     locals: BiHashMap<syntax::Ident, plain::LocalIdent>,
     globals: BiHashMap<syntax::Ident, plain::UnresolvedIdent>,
 
-    local_locs: HashMap<syntax::Ident, L>,
-    _marker: std::marker::PhantomData<L>,
+    local_locs: HashMap<syntax::Ident, LocTy>,
+    _marker: std::marker::PhantomData<LocTy>,
 }
 
-impl<L: LocLike + Debug> RenamerEnv<L> {
+impl<LocTy: LocLike + Debug> RenamerEnv<LocTy> {
     fn new() -> Self {
         RenamerEnv {
             next_local_id: 0,
@@ -247,8 +249,8 @@ impl<L: LocLike + Debug> RenamerEnv<L> {
 
     fn mk_new_local(
         &mut self,
-        input: &Ax<L, syntax::Ident>,
-    ) -> Result<Ax<L, plain::LocalIdent>, DuplicateIdentifierError<L>> {
+        input: &Ax<LocTy, syntax::Ident>,
+    ) -> Result<Ax<LocTy, plain::LocalIdent>, DuplicateIdentifierError<LocTy>> {
         if self.locals.get_by_left(&input.v).is_some() {
             return Err(DuplicateIdentifierError {
                 error: input.clone(),
@@ -281,10 +283,54 @@ impl<L: LocLike + Debug> RenamerEnv<L> {
         self.locals.get_by_left(input).copied()
     }
 
-    fn resolve(&mut self, input: &Ax<L, syntax::Ident>) -> plain::Ident<L> {
+    fn resolve(&mut self, input: &Ax<LocTy, syntax::Ident>) -> plain::Ident<LocTy> {
         match self.resolve_local(&input.v) {
             Some(x) => plain::Ident::Local(ax(input.a.clone(), x)),
             None => plain::Ident::Global(ax(input.a.clone(), self.get_global(&input.v))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::syntax::LitNum;
+    use crate::util::ax::{ax, ax0};
+    use crate::util::bimap::Bimap;
+
+    #[test]
+    fn test_rename() {
+        let input = {
+            use syntax::*;
+            Module {
+                statements: ax0(vec![TopLevelStmt::FunDef(ax0(FunDef {
+                    name: ax0(Ident("foo".to_string())),
+                    params: ax0(vec![]),
+                    preds: ax0(vec![]),
+                    body: ax0(vec![FunStmt::Return(ax0(Return(Expr::LitNum(ax0(
+                        LitNum(42),
+                    )))))]),
+                }))]),
+            }
+        };
+        let expected = {
+            use plain::*;
+            Module {
+                statements: vec![TopLevelStmt::FunDef(ax0(FunDef {
+                    name: ax0(syntax::Ident("foo".to_string())),
+                    implementation: FunImpl {
+                        params: ax0(vec![]),
+                        preds: ax0(vec![]),
+                        body: ax0(vec![FunStmt::Return(ax0(Return(Expr::LitNum(ax0(
+                            LitNum(42),
+                        )))))]),
+                    },
+                    refs: Bimap::new(),
+                }))],
+            }
+        };
+
+        let output = rename(&input).unwrap();
+        assert_eq!(output, expected);
     }
 }

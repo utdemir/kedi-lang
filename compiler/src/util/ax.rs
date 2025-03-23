@@ -1,6 +1,8 @@
 use std::ops::Deref;
 
-#[derive(Debug, Clone, Copy, Hash)]
+use functor_derive::Functor;
+
+#[derive(Debug, Clone, Copy, Hash, Functor, PartialEq, Eq)]
 pub struct Ax<Attachment, Value> {
     pub a: Attachment,
     pub v: Value,
@@ -13,16 +15,12 @@ impl<_Attachment, Value> Deref for Ax<_Attachment, Value> {
     }
 }
 
-impl<T: PartialEq> PartialEq for Ax<(), T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.v == other.v
-    }
-}
-
-impl<T: Eq> Eq for Ax<(), T> {}
-
 pub fn ax<A, V>(a: A, v: V) -> Ax<A, V> {
     Ax { a, v }
+}
+
+pub fn ax0<V>(v: V) -> Ax<(), V> {
+    ax((), v)
 }
 
 impl<Attachment, Value> Ax<Attachment, Value> {
@@ -59,8 +57,4 @@ impl<Attachment, Value> Ax<Attachment, Option<Value>> {
     pub fn transpose(self) -> Option<Ax<Attachment, Value>> {
         self.v.map(|v| ax(self.a, v))
     }
-}
-
-trait HasAx<Attachment> {
-    fn ax(&self) -> Attachment;
 }

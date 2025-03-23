@@ -23,6 +23,7 @@ wasmprinter = { version = "0.209.1", optional = true }
 getrandom = { version = "*", features = ["js"] }
 num-bigint = "0.4.6"
 proc-macro2 = "1.0.92"
+functor_derive = "0.4.3"
 
 [dev-dependencies]
 wasm-exec = { path = "../wasm_exec" }

@@ -16,76 +16,76 @@ pub struct LitStr(pub String);
 // Expressions
 
 #[derive(Debug, Clone)]
-pub enum Expr<L> {
-    LitNum(Ax<L, LitNum>),
-    LitStr(Ax<L, LitStr>),
-    Ident(Ax<L, Ident>),
-    FunCall(FunCall<L>),
+pub enum Expr<LocTy> {
+    LitNum(Ax<LocTy, LitNum>),
+    LitStr(Ax<LocTy, LitStr>),
+    Ident(Ax<LocTy, Ident>),
+    FunCall(FunCall<LocTy>),
 }
 
 #[derive(Debug, Clone)]
-pub struct FunDef<L> {
-    pub name: Ax<L, Ident>,
-    pub params: Ax<L, Vec<Ax<L, Ident>>>,
-    pub preds: Ax<L, Vec<Expr<L>>>,
-    pub body: Ax<L, Vec<FunStmt<L>>>,
+pub struct FunDef<LocTy> {
+    pub name: Ax<LocTy, Ident>,
+    pub params: Ax<LocTy, Vec<Ax<LocTy, Ident>>>,
+    pub preds: Ax<LocTy, Vec<Expr<LocTy>>>,
+    pub body: Ax<LocTy, Vec<FunStmt<LocTy>>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct FunCall<L> {
-    pub name: Ax<L, Ident>,
-    pub args: Ax<L, Vec<Expr<L>>>,
+pub struct FunCall<LocTy> {
+    pub name: Ax<LocTy, Ident>,
+    pub args: Ax<LocTy, Vec<Expr<LocTy>>>,
 }
 
 #[derive(Debug, Clone)]
-pub enum TopLevelStmt<L> {
-    FunDef(Ax<L, FunDef<L>>),
+pub enum TopLevelStmt<LocTy> {
+    FunDef(Ax<LocTy, FunDef<LocTy>>),
 }
 
 #[derive(Debug, Clone)]
-pub enum FunStmt<L> {
-    Return(Ax<L, Return<L>>),
-    Inv(Ax<L, Inv<L>>),
-    LetDecl(Ax<L, LetDecl<L>>),
-    While(Ax<L, While<L>>),
-    Assignment(Ax<L, Assignment<L>>),
-    If(Ax<L, If<L>>),
+pub enum FunStmt<LocTy> {
+    Return(Ax<LocTy, Return<LocTy>>),
+    Inv(Ax<LocTy, Inv<LocTy>>),
+    LetDecl(Ax<LocTy, LetDecl<LocTy>>),
+    While(Ax<LocTy, While<LocTy>>),
+    Assignment(Ax<LocTy, Assignment<LocTy>>),
+    If(Ax<LocTy, If<LocTy>>),
 }
 
 #[derive(Debug, Clone)]
-pub struct Return<L>(pub Expr<L>);
+pub struct Return<LocTy>(pub Expr<LocTy>);
 
 #[derive(Debug, Clone)]
-pub struct Inv<L> {
-    pub value: Ax<L, Expr<L>>,
+pub struct Inv<LocTy> {
+    pub value: Ax<LocTy, Expr<LocTy>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct LetDecl<L> {
-    pub name: Ax<L, Ident>,
-    pub value: Expr<L>,
+pub struct LetDecl<LocTy> {
+    pub name: Ax<LocTy, Ident>,
+    pub value: Expr<LocTy>,
 }
 
 #[derive(Debug, Clone)]
-pub struct While<L> {
-    pub condition: Expr<L>,
-    pub body: Ax<L, Vec<FunStmt<L>>>,
+pub struct While<LocTy> {
+    pub condition: Expr<LocTy>,
+    pub body: Ax<LocTy, Vec<FunStmt<LocTy>>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Assignment<L> {
-    pub name: Ax<L, Ident>,
-    pub value: Expr<L>,
+pub struct Assignment<LocTy> {
+    pub name: Ax<LocTy, Ident>,
+    pub value: Expr<LocTy>,
 }
 
 #[derive(Debug, Clone)]
-pub struct If<L> {
-    pub condition: Expr<L>,
-    pub then: Ax<L, Vec<FunStmt<L>>>,
-    pub else_: Option<Ax<L, Vec<FunStmt<L>>>>,
+pub struct If<LocTy> {
+    pub condition: Expr<LocTy>,
+    pub then: Ax<LocTy, Vec<FunStmt<LocTy>>>,
+    pub else_: Option<Ax<LocTy, Vec<FunStmt<LocTy>>>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Module<L> {
-    pub statements: Ax<L, Vec<TopLevelStmt<L>>>,
+pub struct Module<LocTy> {
+    pub statements: Ax<LocTy, Vec<TopLevelStmt<LocTy>>>,
 }
